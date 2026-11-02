@@ -397,6 +397,7 @@ var _busy: Node
 ## Every desk's three stars, its next goal and the celebrations
 ## (scenes/office/desk_card.gd).
 var _desk_card: Control
+var _proof_run_counted: Object
 var _talking := false
 ## The conversation in progress: {id, title, steps}, and where we are in it.
 var _talk := {}
@@ -2663,6 +2664,8 @@ func _tick_link(delta: float) -> void:
 		_link.tick("pong", _pong_view.get_child(0))
 	if _cube_vp and _cube_vp.get_child_count() > 0:
 		_link.tick("cube", _cube_vp.get_child(0))
+	if _proof_view and _proof_view.get_child_count() > 0:
+		_link.tick("proof", _proof_view.get_child(0))
 	_tick_goals()
 	var news: Array = _link.pop_news()
 	if not news.is_empty():
@@ -2693,6 +2696,11 @@ func _tick_goals() -> void:
 			if blind is Object and blind.has_method("is_won"):
 				if _goals.proof(blind, blind.is_won()) > 0:
 					relics.bump("proof_wins")
+		# A whole run proven (all three bosses), once per run.
+		var run = proof.get("run") if "run" in proof else null
+		if run is Object and "won" in run and run.won and run != _proof_run_counted:
+			_proof_run_counted = run
+			relics.bump("proof_runs_won")
 
 
 func _update_hint(aim, close: bool) -> void:

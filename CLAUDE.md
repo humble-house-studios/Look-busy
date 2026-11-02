@@ -83,8 +83,9 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   untouched; its window on the CRT goes wide when the phone turns, so Pong plays
   its landscape mode (paddle under the right thumb), and while seated it takes
   touches anywhere. A third desk (right wall, under a chalkboard) runs Proof
-  Hand (`humble-house-studios/proof-hand`) in `res://games/proof/` the same
-  way; it needs its `Game`/`Save` autoloads, which `fetch_games.sh
+  Hand (`humble-house-studios/proof-hand`, full runs: antes, bosses, the
+  Library, Axioms) in `res://games/proof/` the same way (the Loot link's
+  `tick_proof` gives its runs relics and pays tokens); it needs its `Game`/`Save` autoloads, which `fetch_games.sh
   --autoloads` adds to project.godot (CI only; locally `git checkout
   project.godot` after). Other games' autoload names and class_names must not
   clash with ours. Each game's sound fades with distance. The **Loot Machine** cabinet by the right wall

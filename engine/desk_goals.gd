@@ -21,9 +21,9 @@ const DESKS := {
 		["pong_bosses", 1, "BEAT A BOSS (EVERY 4TH STAGE)"],
 		["pong_bosses", 3, "BEAT 3 BOSSES"]]},
 	"proof": {"name": "PROOF HAND", "tiers": [
-		["proof_wins", 1, "PROVE A THEOREM: BEAT THE TARGET"],
-		["proof_wins", 4, "PROVE 4 THEOREMS"],
-		["proof_wins", 10, "PROVE 10 THEOREMS"]]},
+		["proof_wins", 1, "PROVE A BLIND: BEAT ITS TARGET IN 4 PLAYS"],
+		["proof_wins", 3, "PROVE 3 BLINDS (ANTE 1'S BOSS IS THE THIRD)"],
+		["proof_runs_won", 1, "WIN A RUN: PROVE ALL 3 BOSSES"]]},
 	"cube": {"name": "CUBE DESK", "tiers": [
 		["cube_solves", 1, "SOLVE A LEVEL"],
 		["cube_solves", 5, "SOLVE 5 LEVELS"],
