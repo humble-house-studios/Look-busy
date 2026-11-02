@@ -154,7 +154,12 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   loop and three rules, nothing past floor 1 named). Slack meter: playing a
   game unseen fills the day's quota (`Workday.QUOTA`, starts with a coffee
   break); alt-tab with the boss within 4 m = a close call (bonus slack);
-  slack becomes research on Friday (`ShipDay.research`). The HUD counts down
+  slack becomes research on Friday (`ShipDay.research`). **After hours:** 5 PM
+  ringing while seated at a game = you stay (`Workday.start_overtime()`): no
+  boss, slack x2 till 7 PM, the office goes dark (`after_hours` shader global in
+  `project.godot` [shader_globals], faded by office.gd `set_after_hours()`),
+  and tomorrow starts tired (suspicion from minutes stayed). Dev: AFTER HOURS
+  NOW. Why: docs/look-busy.md, "After hours". The HUD counts down
   to the boss's next visit; red screen edges show the side they're on.
   Why: docs/look-busy.md, "Fun pass". Rules in
   `engine/workday.gd` (`user://look_busy.cfg`), tested in

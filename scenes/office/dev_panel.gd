@@ -73,6 +73,7 @@ func setup(o: Node) -> void:
 		["BOSS COMES\nBY NOW", _boss_now],
 		["SKIP TO\n4:55 PM", _skip_day],
 		["SKIP TO\nFRIDAY 4:50", _skip_week],
+		["AFTER HOURS\nNOW", _after_hours],
 		["+1 STRIKE", _strike],
 		["CLEAR STRIKES\n+ SUSPICION", _clear_strikes],
 		["KEV IS A\nLOOKOUT", _role.bind("kev", "lookout")],
@@ -292,6 +293,12 @@ func _skip_day() -> void:
 	if _busy_on():
 		office._busy.dev_skip_to(Workday.DAY_MINUTES - 5.0)
 		_say("4:55 PM. THE BELL RINGS IN A FEW SECONDS.")
+
+
+func _after_hours() -> void:
+	if _busy_on():
+		close()
+		office._busy.dev_after_hours()
 
 
 func _skip_week() -> void:

@@ -8,7 +8,8 @@ extends SceneTree
 ##  - sitting at your desk while the boss watches: suspicion climbs to a
 ##    warning; alt-tab covers the screen with the spreadsheet and cools it;
 ##  - an empty desk while you're out; strikes up to fired and starting over;
-##  - 5 PM and the end of the week.
+##  - 5 PM, after hours (5 PM mid-game: lights out, x2 slack, tired
+##    tomorrow) and the end of the week.
 ## Prints PASS / FAIL lines and a summary. Wipes the office saves.
 ##   godot --headless -s res://tools/busy_walk.gd
 
@@ -201,6 +202,25 @@ func _init() -> void:
 	press_first()
 	await frames(5)
 	check(busy.wd.day == 1 and busy.wd.minutes <= 1.0, "the next morning (%s)" % busy.wd.clock_text())
+	press_first()
+	await frames(5)
+	# After hours: 5 PM rings mid-game, so you stay. Lights out, no boss, x2.
+	office._set_seat(office._computers[0])
+	busy.dev_skip_to(Workday.DAY_MINUTES - 1.0)
+	await frames(90)
+	check(busy.wd.overtime and not busy.notice.visible, "5 PM mid-game: after hours (%s)" % busy.wd.clock_text())
+	await frames(int(Engine.get_frames_per_second() * office.NIGHT_FADE) + 120)
+	check(office._night > 0.9, "the lights go out (%.2f)" % office._night)
+	var ot: float = busy.wd.overtime_slack
+	await frames(30)
+	check(busy.wd.overtime_slack > ot, "slack keeps counting after hours (%s)" % Workday.hours_text(busy.wd.overtime_slack))
+	busy.wd.minutes = Workday.DAY_MINUTES + Workday.OVERTIME_MINUTES - 1.0
+	await frames(90)
+	check(busy.notice.visible and busy.notice._body.text.begins_with("STAYED LATE"), "7 PM: clock out, stayed late")
+	press_first()
+	await frames(5)
+	check(busy.wd.day == 2 and busy.wd.suspicion > 0.0, "the next morning you're tired (%.0f)" % busy.wd.suspicion)
+	check(busy.notice.visible and busy.notice._body.text.begins_with("You stayed late"), "the morning card says so")
 	press_first()
 	await frames(5)
 	# Friday 5 PM: ship day. A strong build beats Theo and gets you promoted.

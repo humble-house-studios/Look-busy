@@ -24,6 +24,11 @@ extends Node
 ##     arcade machines, every 20 spreadsheet cells) and collaborators hand you
 ##     pieces; the DEV KIT desk by the door (scenes/office/dev_kit.gd) combines
 ##     them into a scored game with a generated trailer.
+##   - After hours: if 5 PM rings while you're seated at a game, everyone goes
+##     home (except Dale) and you stay. The lights go out (office.gd
+##     set_after_hours(): moonlight, desk lamp, glowing CRTs), the clock runs
+##     on to 7 PM with no boss, slack counts double, and tomorrow you come in
+##     tired (suspicion from the minutes you stayed). Workday.start_overtime().
 ##   - 5 PM: clock out. Friday 5 PM is ship day (engine/ship_day.gd): press
 ##     and coworker reviews, Theo ships his game, the reviews pay out (arcade
 ##     tokens and tickets), and a good week promotes you to the next floor and
@@ -228,6 +233,7 @@ func set_enabled(on: bool) -> void:
 # ---------------------------------------------------------------- every frame
 
 func tick(delta: float) -> void:
+	office.set_after_hours(enabled and wd.after_hours())
 	if not enabled:
 		_alt_button.visible = false
 		return
@@ -253,6 +259,14 @@ func tick(delta: float) -> void:
 			"snitch":
 				_snitch()
 			"day_end":
+				# Mid-game when the bell rings: stay after hours.
+				if office._seat != null and not notice.visible and wd.start_overtime():
+					_start_overtime()
+				else:
+					_day_end()
+				return
+			"overtime_end":
+				wd.end_overtime()
 				_day_end()
 				return
 	_tick_visit(delta)
@@ -695,6 +709,17 @@ func _start_over() -> void:
 
 # ---------------------------------------------------------------- the day
 
+## 5 PM rang while you were playing: everyone heads home and you stay.
+func _start_overtime() -> void:
+	uncover()
+	_end_visit()
+	_call_t = -1.0
+	_ring.stop()
+	_play(BELL, -4.0)
+	office._toast.text = "5:00 PM. EVERYONE WENT HOME. (EXCEPT DALE.)\nAFTER HOURS: SLACK COUNTS x%d TILL 7. YOU'LL BE TIRED TOMORROW." % int(Workday.OVERTIME_SLACK)
+	office._toast_time = 6.0
+
+
 func _day_end() -> void:
 	uncover()
 	_end_visit()
@@ -709,7 +734,10 @@ func _day_end() -> void:
 		Workday.hours_text(wd.slacked), Workday.hours_text(wd.quota()), "  QUOTA MET!" if met else "  (quota missed)",
 		Workday.hours_text(wd.best_slack), wd.close_calls, wd.strikes,
 		gm.title() if not gm.build.is_empty() else "nothing yet", gm.build.size()]
-	notice.show_notice("CLOCK.EXE", "5:00 PM", body, [["GO HOME", _next_day]], Color(0.1, 0.5, 0.2) if met else Color(0.06, 0.14, 0.6))
+	if wd.stayed() > 0.0:
+		body = "STAYED LATE: +%s slack after hours.\nYou'll come in tired: suspicion starts at %d%%.\n\n" % [
+			Workday.hours_text(wd.overtime_slack), int(wd.tired / Workday.MAX_SUSPICION * 100.0)] + body
+	notice.show_notice("CLOCK.EXE", Workday.time_text(wd.minutes), body, [["GO HOME", _next_day]], Color(0.1, 0.5, 0.2) if met else Color(0.06, 0.14, 0.6))
 
 
 # ---------------------------------------------------------------- Friday
@@ -813,6 +841,8 @@ func _on_clock_in() -> void:
 		_morning_shown = true
 		var b := wd.boss()
 		office._toast.text = "%s, 9:00 AM. BOSS: %s.\nSLACK %s TODAY. DON'T GET CAUGHT." % [BusyLines.DAYS[wd.day], b.name, Workday.hours_text(wd.quota())]
+		if wd.suspicion > 0.0:
+			office._toast.text += "\nYOU STAYED LATE. YOU LOOK IT."
 		office._toast_time = 5.0
 
 
@@ -822,6 +852,8 @@ func _morning() -> void:
 	var day: String = BusyLines.DAYS[wd.day]
 	var body := "%s\n\nBOSS: %s\n%s\n\nTODAY: SLACK %s (coffee counts: %s already).\nWatch the countdown at the top.\n\n%s" % [
 		BusyLines.MORNING[wd.day], b.hello, b.habit, Workday.hours_text(wd.quota()), Workday.hours_text(wd.slacked), crew_text()]
+	if wd.suspicion > 0.0:
+		body = "You stayed late last night, and you look it. Suspicion starts at %d%%.\n\n" % int(wd.suspicion / Workday.MAX_SUSPICION * 100.0) + body
 	notice.show_notice("MONDAY.EXE" if wd.day == 0 else day + ".EXE", "%s, 9:00 AM" % day, body, [["CLOCK IN", func(): pass]], Color(0.06, 0.14, 0.6))
 
 
@@ -873,6 +905,7 @@ func on_seat_changed() -> void:
 func ship_now() -> void:
 	if not wd.is_friday():
 		return
+	wd.end_overtime()
 	wd.minutes = Workday.DAY_MINUTES
 	wd.save()
 	_day_end()
@@ -941,7 +974,11 @@ func _draw_hud() -> void:
 	var line := ""
 	var band := Color(0, 0, 0, 0)
 	var ink := Color(1, 1, 1, 0.8)
-	if watched:
+	if wd.overtime:
+		line = "AFTER HOURS: x%d TILL 7" % int(Workday.OVERTIME_SLACK)
+		band = Color(0.12, 0.14, 0.38)
+		ink = Color(0.7, 0.85, 1.0)
+	elif watched:
 		line = "!! %s SEES YOU !!" % b.name
 		band = Color(0.75, 0.08, 0.06) if blink else Color(0.45, 0.04, 0.03)
 		ink = Color.WHITE
@@ -1011,6 +1048,13 @@ func dev_boss_now() -> void:
 func dev_skip_to(minute: float) -> void:
 	wd.minutes = clampf(minute, 0.0, Workday.DAY_MINUTES - 0.1)
 	wd.save()
+
+
+## Straight into after hours (as if 5 PM rang mid-game).
+func dev_after_hours() -> void:
+	wd.minutes = Workday.DAY_MINUTES
+	if wd.start_overtime():
+		_start_overtime()
 
 
 func dev_friday() -> void:

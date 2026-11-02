@@ -297,6 +297,15 @@ var _head: Node3D
 var _camera: Camera3D
 var _screen_camera: Camera3D
 var _clock_hands: Array[Node3D] = []
+## After hours (look_busy.gd: 5 PM rang mid-game): 0 = golden hour, 1 = night.
+## Fades over NIGHT_FADE seconds; drives ps1.gdshader's after_hours global and
+## the glow of the ceiling panels, the window and the sunbeam ([mat, day, night]).
+const NIGHT_FADE := 3.0
+var _night := 0.0
+var _night_on := false
+var _night_glow: Array = []
+## Push the lighting once at start (the global outlives a NEW GAME reload).
+var _night_dirty := true
 var _hud: Control
 var _hint: Label
 var _title: Label
@@ -809,6 +818,27 @@ func _putty() -> ShaderMaterial:
 	return _mat(Color(0.8, 0.8, 0.76), 6, Color.BLACK, 40.0)
 
 
+## After hours on or off (look_busy.gd calls this every frame); the lights fade.
+func set_after_hours(on: bool) -> void:
+	_night_on = on
+
+
+func _tick_night(delta: float) -> void:
+	var was := _night
+	_night = move_toward(_night, 1.0 if _night_on else 0.0, delta / NIGHT_FADE)
+	if is_equal_approx(was, _night) and not _night_dirty:
+		return
+	_night_dirty = false
+	_apply_night()
+
+
+func _apply_night() -> void:
+	var e := _night * _night * (3.0 - 2.0 * _night)
+	RenderingServer.global_shader_parameter_set("after_hours", e)
+	for g in _night_glow:
+		g[0].set_shader_parameter("emission", (g[1] as Color).lerp(g[2], e))
+
+
 func _build_room() -> void:
 	# Room: x -3.5..3.5, z -3..4, 2.6 tall. You start by the door at +z.
 	# Golden hour: cream walls, soft sage carpet, warm wood trim, lit mostly by
@@ -832,16 +862,21 @@ func _build_room() -> void:
 
 	# Ceiling panels, dimmed: the sun does the lighting.
 	var panel := _mat(Color(0.2, 0.2, 0.2), 0, Color.BLACK, 24.0, Color(0.62, 0.55, 0.45))
+	_night_glow.append([panel, Color(0.62, 0.55, 0.45), Color(0.04, 0.05, 0.07)])
 	_box(Vector3(0.6, 0.03, 1.2), Vector3(0, 2.59, -1.6), panel)
 	_box(Vector3(0.6, 0.03, 1.2), Vector3(0, 2.59, 2.2), panel)
 
 	# Window on the left wall: an orange evening sky through half-open blinds,
 	# and the long low sunbeam it throws across the carpet.
-	_box(Vector3(0.04, 1.1, 1.8), Vector3(-3.49, 1.5, -0.5), _mat(Color(0.5, 0.48, 0.42), 4, Color(0.1, 0.1, 0.1), 24.0, Color(1.0, 0.68, 0.36)))
+	var sky := _mat(Color(0.5, 0.48, 0.42), 4, Color(0.1, 0.1, 0.1), 24.0, Color(1.0, 0.68, 0.36))
+	_night_glow.append([sky, Color(1.0, 0.68, 0.36), Color(0.14, 0.2, 0.42)])
+	_box(Vector3(0.04, 1.1, 1.8), Vector3(-3.49, 1.5, -0.5), sky)
 	_box(Vector3(0.08, 1.2, 0.06), Vector3(-3.47, 1.5, 0.43), trim)
 	_box(Vector3(0.08, 1.2, 0.06), Vector3(-3.47, 1.5, -1.43), trim)
 	_box(Vector3(0.12, 0.05, 1.9), Vector3(-3.45, 0.93, -0.5), trim)
-	_box(Vector3(4.2, 0.004, 1.3), Vector3(-1.3, 0.003, -0.35), _mat(Color(0.58, 0.66, 0.56), 1, Color(0.5, 0.58, 0.5), 28.0, Color(0.42, 0.2, 0.04)), false, Vector3(0, 0.18, 0))
+	var beam := _mat(Color(0.58, 0.66, 0.56), 1, Color(0.5, 0.58, 0.5), 28.0, Color(0.42, 0.2, 0.04))
+	_night_glow.append([beam, Color(0.42, 0.2, 0.04), Color(0.02, 0.04, 0.1)])
+	_box(Vector3(4.2, 0.004, 1.3), Vector3(-1.3, 0.003, -0.35), beam, false, Vector3(0, 0.18, 0))
 
 	_build_desk()
 	_build_pong_desk()
@@ -2693,6 +2728,7 @@ func _process(delta: float) -> void:
 
 	_tick_link(delta)
 	_busy.tick(delta)
+	_tick_night(delta)
 	_tick_dale(delta)
 	_ladder.tick(delta)
 	_tick_goal(delta)

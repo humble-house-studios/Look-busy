@@ -8,6 +8,9 @@ extends RefCounted
 ## write-up, then you're fired and the run starts over on floor 1.
 ## Pure rules, no scenes (scenes/office/look_busy.gd drives the office side).
 ## Saved in user://look_busy.cfg. Bosses and lines: data/busy_lines.gd.
+## After hours: if 5 PM rings while you're mid-game, everyone goes home and you
+## stay. The clock runs on to 7 PM with no boss, slack counts double, and the
+## next morning you start tired (suspicion from the minutes you stayed).
 
 const SAVE_PATH := "user://look_busy.cfg"
 ## Real seconds in a workday (9:00 to 17:00 = 480 game minutes).
@@ -43,6 +46,12 @@ const MORNING_COFFEE := 15.0
 ## caught: a close call, worth slack minutes. Once per visit.
 const CLOSE_CALL := 10.0
 const CLOSE_RANGE := 4.0
+## After hours: game minutes past 5 PM (to 7 PM), slack multiplier, and the
+## suspicion you start the next morning with per minute stayed (capped).
+const OVERTIME_MINUTES := 120.0
+const OVERTIME_SLACK := 2.0
+const TIRED_PER_MINUTE := 0.25
+const TIRED_MAX := 30.0
 
 var week := 1
 var floor_i := 1
@@ -69,6 +78,10 @@ var close_calls := 0
 ## Days this week the quota was met.
 var quota_days := 0
 var _quota_hit := false
+## After hours: on now; slack earned in it today; suspicion owed to tomorrow.
+var overtime := false
+var overtime_slack := 0.0
+var tired := 0.0
 
 var _path: String
 var _grace := 0.0
@@ -111,11 +124,21 @@ func next_visit(from := -1.0) -> float:
 ## Run the clock. Returns events in order: {"type": "soon"} LOOKOUT_LEAD
 ## before a visit (a lookout's cue), {"type": "visit"} when the boss is due,
 ## {"type": "snitch"} at SNITCH_AT (a snitch's cue), {"type": "day_end"} at
-## 5 PM (the clock then waits for next_day()).
+## 5 PM (the clock then waits for next_day(), or start_overtime()). After
+## hours it runs on to 7 PM: {"type": "overtime_end"}.
 func tick(delta: float) -> Array:
 	var out: Array = []
 	_grace = maxf(0.0, _grace - delta)
-	if fired or minutes >= DAY_MINUTES:
+	if fired:
+		return out
+	if overtime:
+		var end := DAY_MINUTES + OVERTIME_MINUTES
+		if minutes < end:
+			minutes = minf(end, minutes + delta * DAY_MINUTES / DAY_SECONDS)
+			if minutes >= end:
+				out.append({"type": "overtime_end"})
+		return out
+	if minutes >= DAY_MINUTES:
 		return out
 	var before := minutes
 	minutes = minf(DAY_MINUTES, minutes + delta * DAY_MINUTES / DAY_SECONDS)
@@ -178,8 +201,17 @@ func strike() -> String:
 
 ## Playing a game unseen fills the slack meter. True the moment today's
 ## quota is met.
+## After hours it counts OVERTIME_SLACK times over.
 func slack(delta: float, activity: String, seen: bool) -> bool:
-	if fired or minutes >= DAY_MINUTES or activity != "slacking" or seen:
+	if fired or activity != "slacking" or seen:
+		return false
+	if overtime:
+		if minutes >= DAY_MINUTES + OVERTIME_MINUTES:
+			return false
+		var m := delta * DAY_MINUTES / DAY_SECONDS * OVERTIME_SLACK
+		overtime_slack += m
+		return _add_slack(m)
+	if minutes >= DAY_MINUTES:
 		return false
 	return _add_slack(delta * DAY_MINUTES / DAY_SECONDS)
 
@@ -231,8 +263,42 @@ func is_friday() -> bool:
 	return day >= BusyLines.DAYS.size() - 1
 
 
+## 5 PM has rung and you've gone home (after hours isn't over yet).
 func day_over() -> bool:
-	return minutes >= DAY_MINUTES
+	return minutes >= DAY_MINUTES and not overtime
+
+
+## 5 PM rang mid-game: stay after hours. False if it's not 5 yet (or you're
+## already staying, or fired).
+func start_overtime() -> bool:
+	if fired or overtime or minutes < DAY_MINUTES:
+		return false
+	overtime = true
+	overtime_slack = 0.0
+	_grace = 0.0
+	suspicion = 0.0
+	save()
+	return true
+
+
+## Clock out of after hours (7 PM, or you left): tomorrow's tiredness comes
+## from the minutes you stayed.
+func end_overtime() -> void:
+	if not overtime:
+		return
+	overtime = false
+	tired = minf(TIRED_MAX, stayed() * TIRED_PER_MINUTE)
+	save()
+
+
+## Game minutes stayed past 5 PM (0 if you went home on time).
+func stayed() -> float:
+	return maxf(0.0, minutes - DAY_MINUTES)
+
+
+## After hours lighting: on while staying late and until you go home.
+func after_hours() -> bool:
+	return overtime or minutes > DAY_MINUTES
 
 
 ## The next morning. False on Friday (the week ends instead: new_week()).
@@ -255,6 +321,7 @@ func new_week(promote: bool) -> void:
 	strikes = 0
 	slacked_week = 0.0
 	quota_days = 0
+	tired = 0.0
 	_morning()
 	save()
 
@@ -269,6 +336,7 @@ func start_over() -> void:
 	fired = false
 	slacked_week = 0.0
 	quota_days = 0
+	tired = 0.0
 	_morning()
 	save()
 
@@ -292,7 +360,11 @@ func cover() -> bool:
 func _morning() -> void:
 	covers_today = 0
 	minutes = 0.0
-	suspicion = 0.0
+	# Stayed late last night: you come in tired, and it shows.
+	suspicion = tired
+	tired = 0.0
+	overtime = false
+	overtime_slack = 0.0
 	cells_today = 0
 	_grace = 0.0
 	close_calls = 0
@@ -393,7 +465,7 @@ func load_save() -> void:
 	week = int(cfg.get_value("run", "week", 1))
 	floor_i = clampi(int(cfg.get_value("run", "floor", 1)), 1, BusyLines.FLOORS)
 	day = clampi(int(cfg.get_value("run", "day", 0)), 0, 4)
-	minutes = clampf(float(cfg.get_value("run", "minutes", 0.0)), 0.0, DAY_MINUTES)
+	minutes = clampf(float(cfg.get_value("run", "minutes", 0.0)), 0.0, DAY_MINUTES + OVERTIME_MINUTES)
 	suspicion = clampf(float(cfg.get_value("run", "suspicion", 0.0)), 0.0, MAX_SUSPICION)
 	strikes = clampi(int(cfg.get_value("run", "strikes", 0)), 0, STRIKES.size())
 	fired = bool(cfg.get_value("run", "fired", false))
@@ -407,6 +479,9 @@ func load_save() -> void:
 	best_slack = float(cfg.get_value("run", "best_slack", slacked))
 	close_calls = int(cfg.get_value("run", "close_calls", 0))
 	quota_days = int(cfg.get_value("run", "quota_days", 0))
+	overtime = bool(cfg.get_value("run", "overtime", false))
+	overtime_slack = float(cfg.get_value("run", "overtime_slack", 0.0))
+	tired = clampf(float(cfg.get_value("run", "tired", 0.0)), 0.0, TIRED_MAX)
 	_quota_hit = slacked >= quota()
 	var sh = cfg.get_value("run", "shipped", [])
 	shipped = sh if sh is Array else []
@@ -433,4 +508,7 @@ func save() -> void:
 	cfg.set_value("run", "best_slack", best_slack)
 	cfg.set_value("run", "close_calls", close_calls)
 	cfg.set_value("run", "quota_days", quota_days)
+	cfg.set_value("run", "overtime", overtime)
+	cfg.set_value("run", "overtime_slack", overtime_slack)
+	cfg.set_value("run", "tired", tired)
 	cfg.save(_path)

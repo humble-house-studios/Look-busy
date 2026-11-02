@@ -202,3 +202,99 @@ func test_slack_saves_and_resets_with_the_week() -> void:
 	assert_eq(again.slacked_week, Workday.MORNING_COFFEE)
 	assert_eq(again.quota_days, 0)
 	assert_almost_eq(again.best_slack, w.best_slack, 0.01, "the best day is forever")
+
+
+# ---------------------------------------------------------------- after hours
+
+func _to_five(w: Workday) -> void:
+	w.minutes = Workday.DAY_MINUTES - 0.5
+	var ended := false
+	for ev in w.tick(1.0):
+		if ev.type == "day_end":
+			ended = true
+	assert_true(ended, "5 PM rings")
+
+
+func test_after_hours_only_starts_once_five_rings() -> void:
+	var w := Workday.new(PATH)
+	assert_false(w.start_overtime(), "not before 5")
+	_to_five(w)
+	assert_true(w.day_over())
+	assert_true(w.start_overtime())
+	assert_false(w.start_overtime(), "already staying")
+	assert_false(w.day_over(), "the day isn't over while you stay")
+	assert_true(w.after_hours())
+
+
+func test_after_hours_runs_to_seven_with_no_boss() -> void:
+	var w := Workday.new(PATH)
+	_to_five(w)
+	w.start_overtime()
+	var ended := 0
+	var other := 0
+	var secs := int(Workday.OVERTIME_MINUTES * Workday.DAY_SECONDS / Workday.DAY_MINUTES) + 2
+	for i in secs:
+		for ev in w.tick(1.0):
+			if ev.type == "overtime_end":
+				ended += 1
+			else:
+				other += 1
+	assert_eq(ended, 1, "7 PM ends it once")
+	assert_eq(other, 0, "no boss, no snitch after hours")
+	assert_eq(w.clock_text(), "MON 7:00 PM")
+	assert_eq(w.tick(1.0), [], "the clock waits at 7")
+
+
+func test_after_hours_slack_counts_double() -> void:
+	var w := Workday.new(PATH)
+	_to_five(w)
+	var before := w.slacked
+	assert_false(w.slack(1.0, "slacking", false), "no slack at 5 if you went home")
+	assert_eq(w.slacked, before)
+	w.start_overtime()
+	w.slack(10.0, "slacking", false)
+	var expect := 10.0 * Workday.DAY_MINUTES / Workday.DAY_SECONDS * Workday.OVERTIME_SLACK
+	assert_almost_eq(w.slacked, before + expect, 0.01)
+	assert_almost_eq(w.overtime_slack, expect, 0.01)
+	w.slack(5.0, "working", false)
+	assert_almost_eq(w.overtime_slack, expect, 0.01, "only playing counts")
+
+
+func test_staying_late_makes_you_tired_tomorrow() -> void:
+	var w := Workday.new(PATH)
+	_to_five(w)
+	w.start_overtime()
+	w.minutes = Workday.DAY_MINUTES + 40.0
+	w.end_overtime()
+	assert_false(w.overtime)
+	assert_true(w.day_over())
+	assert_true(w.after_hours(), "still night until you go home")
+	assert_almost_eq(w.tired, 40.0 * Workday.TIRED_PER_MINUTE, 0.01)
+	w.next_day()
+	assert_almost_eq(w.suspicion, 40.0 * Workday.TIRED_PER_MINUTE, 0.01, "you come in tired")
+	assert_eq(w.tired, 0.0)
+	assert_false(w.after_hours(), "morning again")
+
+
+func test_tiredness_is_capped_and_a_new_week_is_fresh() -> void:
+	var w := Workday.new(PATH)
+	_to_five(w)
+	w.start_overtime()
+	w.minutes = Workday.DAY_MINUTES + Workday.OVERTIME_MINUTES
+	w.end_overtime()
+	assert_eq(w.tired, minf(Workday.TIRED_MAX, Workday.OVERTIME_MINUTES * Workday.TIRED_PER_MINUTE))
+	w.new_week(false)
+	assert_eq(w.suspicion, 0.0, "the weekend fixes it")
+
+
+func test_after_hours_survives_a_reload() -> void:
+	var w := Workday.new(PATH)
+	_to_five(w)
+	w.start_overtime()
+	w.minutes = Workday.DAY_MINUTES + 30.0
+	w.slack(2.0, "slacking", false)
+	w.save()
+	var w2 := Workday.new(PATH)
+	assert_true(w2.overtime)
+	assert_almost_eq(w2.minutes, Workday.DAY_MINUTES + 30.0, 0.01)
+	assert_almost_eq(w2.overtime_slack, w.overtime_slack, 0.01)

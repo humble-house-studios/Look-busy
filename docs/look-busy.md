@@ -222,3 +222,22 @@ problems they all shared:
 | **Earning a star: a banner, a fanfare, and "OFFICE TOTAL n/24".** The total is also on the title screen. | A short, loud reward at the moment of success makes the win feel earned. A running total gives each desk a reason to be beaten. |
 | **The seated camera frames the screen clear of the buttons, the HUD and the card.** | Nothing a game shows is hidden. |
 | **Comedy's opening rules: 5 lines of small text became 3 big steps.** | On a desk monitor the old text was unreadable; the in-game coach teaches the rest live. |
+
+## After hours (2026-11-02)
+
+If 5 PM rings while you're seated at a game, you don't clock out: everyone
+goes home (except Dale) and you stay. The office goes dark (ceiling lights
+off, moonlight through the blinds, Dale's desk lamp, the CRTs and the Loot
+Machine lighting the room) and the clock runs on to 7 PM.
+
+| Rule | Why |
+|---|---|
+| **No boss, slack counts x2** until 7 PM. | The reward for being mid-game when the bell rings: finish what you started, and catch up on a missed quota. |
+| **Tomorrow you come in tired:** suspicion starts at 0.25% per game minute you stayed (max 30%). A new week starts fresh. | A real cost, so staying late is a choice with a trade-off, not a free bonus. Crunch on Friday feeds your game's research before ship day. |
+| Standing up doesn't end it; 7 PM does. | Switching desks after hours stays allowed (the arcade is open late too). |
+
+Later: after hours as a relic or bonus mode (e.g. a relic that skips the
+tiredness, or a night-only desk). Rules: `Workday.start_overtime()` /
+`end_overtime()`, tested in `tests/test_workday.gd`. Lights: the
+`after_hours` shader global (`project.godot` [shader_globals]), faded by
+`office.gd` `set_after_hours()`.
