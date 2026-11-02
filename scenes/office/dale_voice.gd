@@ -28,6 +28,12 @@ var _listening := false
 var _web_wait := false
 var _held := 0.0
 var _web_persona := ""
+## Extra fields for the server (a coworker's judge spec and voice), set by
+## stop_listening() and sent with the clip.
+var _extra := {}
+## The judge's grade of what you last said to a coworker ({stance, warmth,
+## key}), or {} for Dale / when no grade came back.
+var last_verdict := {}
 ## What you've said so far (16-bit mono at RATE), and where the resampler is.
 var _pcm := PackedByteArray()
 var _phase := 0.0
@@ -129,7 +135,9 @@ func start_listening() -> bool:
 
 
 ## Let go of TALK: send what was said, with Dale's persona and the chat so far.
-func stop_listening(persona: String) -> void:
+## extra: more fields for the server (a coworker's {judge, voice}).
+func stop_listening(persona: String, extra := {}) -> void:
+	_extra = extra
 	if not listening():
 		return
 	if _web_rec():
@@ -249,6 +257,7 @@ static func add_frames(pcm: PackedByteArray, frames: PackedVector2Array, step: f
 
 func _send(body: Dictionary, persona: String) -> void:
 	body.persona = persona
+	body.merge(_extra)
 	body.history = history.slice(maxi(0, history.size() - 10))
 	busy = true
 	var err := _http.request(VoiceServer.URL.trim_suffix("/") + "/talk", ["Content-Type: application/json"],
@@ -269,6 +278,8 @@ func _on_done(result: int, code: int, _headers: PackedStringArray, body: PackedB
 		failed.emit(str(data.get("error", DaleLines.MIC_LINES[5])))
 		return
 	var heard := str(data.get("heard", ""))
+	var v = data.get("verdict")
+	last_verdict = v if v is Dictionary else {}
 	history.append({"role": "user", "content": heard})
 	history.append({"role": "assistant", "content": reply})
 	_play(str(data.get("audio", "")))

@@ -204,6 +204,18 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   machines pause. Screenshots: `tools/ladder_shot.gd`; a scripted walkthrough of
   every door, screen and coworker: `godot --headless -s res://tools/ladder_walk.gd`
   (prints PASS/FAIL; both wipe the ladder saves).
+  **Talking to coworkers out loud:** after a coworker's talk, HOLD TO TALK
+  works like Dale's (tap replies stay the backup). `Coworkers.chat_spec()`
+  sends the voice server their brief (`CoworkerLines.CHAT[id].who`, mood by
+  trust, what they've shared, what they keep secret, gossip about the
+  others' keys) and a judge spec; the server's judge grades what you said
+  (`{stance, warmth, key}`) and `Coworkers.chat()` applies it: their current
+  hidden key (one of three per coworker, never shown; the only hints are
+  the others' gossip) opens a tier once per visit, three warm chats in
+  their loved style make a tier, their hated style or rudeness closes them
+  off. The AI never grants rewards; payouts are the same tier rewards.
+  They speak in their recorded Aura voice (`Coworkers.CHAT_VOICES`).
+  Tests: `tests/test_coworker_chat.gd`.
   Design: `docs/narrative.md` (The Ladder).
 - **Dev tools** (`engine/dev.gd`, `Dev.ON`; set it to false before shipping):
   skip ahead for testing. The office has a DEV button under LOOK (or ` / F1)

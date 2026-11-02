@@ -27,6 +27,15 @@ var met: Array[String] = []
 var seen_at := {}
 ## Look Busy: coworkers you burned (they snitch until you make up).
 var burned: Array[String] = []
+## Talking out loud: id -> warm chats in their favourite style since the last
+## tier (RAPPORT_NEED of them earn a tier, like a key does).
+var rapport := {}
+## id -> machine rounds played when they last went up a tier by chatting
+## (one tier per visit).
+var leveled_at := {}
+
+## Warm chats in a coworker's favourite style that add up to a tier.
+const RAPPORT_NEED := 3
 
 var _path: String
 var _rng := RandomNumberGenerator.new()
@@ -174,6 +183,14 @@ func choose(id: String, choice: Dictionary, ctx: Dictionary) -> Dictionary:
 					out.lines.append(cb.reply)
 			used_callbacks.append(choice.callback)
 			out.delta = 1
+	_settle(id, before, role_before, out, ctx)
+	return out
+
+
+## Applies out.delta and everything it unlocks: tier payouts (bonus, secret,
+## perk) appended to out.lines / out.rewards, and Look Busy role changes.
+func _settle(id: String, before: int, role_before: String, out: Dictionary, ctx: Dictionary) -> void:
+	var p := person(id)
 	trust[id] = clampi(before + out.delta, 0, MAX_TIER)
 	# Any warm reply (loved, a gift, a callback) makes up for burning them.
 	if out.delta > 0:
@@ -202,7 +219,116 @@ func choose(id: String, choice: Dictionary, ctx: Dictionary) -> Dictionary:
 			"snitch":
 				out.lines.append(b.get("snitch", ""))
 	save()
+
+
+# ---------------------------------------------------------------- talking out loud
+
+## Everything the voice server needs to play this coworker: {persona (the AI's
+## brief), judge ({name, key, line}: what to grade the player's words on),
+## voice ({aura, gemini}: their speaking voice)}. `line` is what they last
+## said, so the judge knows what you're answering.
+func chat_spec(id: String, ctx: Dictionary, line := "") -> Dictionary:
+	return {"persona": chat_persona(id, ctx), "voice": CHAT_VOICES.get(id, {}),
+		"judge": {"name": person(id).get("name", id).capitalize(), "key": current_key(id).get("topic", ""), "line": line}}
+
+
+## The hidden topic that opens them up a tier now ({} at the top tier).
+func current_key(id: String) -> Dictionary:
+	var keys: Array = CoworkerLines.CHAT.get(id, {}).get("keys", [])
+	var t := tier(id)
+	return keys[t] if t < keys.size() else {}
+
+
+## The AI's brief: who they are, how they feel about you, what they've told
+## you, what they keep secret, the topic that would open them up (never to be
+## hinted at), and gossip about the others' keys (only if asked about them).
+func chat_persona(id: String, ctx: Dictionary) -> String:
+	var p := person(id)
+	var c: Dictionary = CoworkerLines.CHAT.get(id, {})
+	var t := tier(id)
+	var name: String = p.get("name", id).capitalize()
+	var lines: Array[String] = []
+	lines.append("You are %s. You're on break in the arcade of Humble House Games, a small video game studio, talking out loud with the new hire." % c.get("who", name))
+	lines.append("How you talk: one to three short spoken sentences, under 40 words, in your own voice. Plain words. No stage directions, no brackets, no emotion labels. Never say you're an AI or a character.")
+	var mood: Array = ["You don't know the new hire and you're a bit guarded.", "You're warming up to the new hire.",
+		"You like the new hire and trust them with real things.", "The new hire is a real friend."]
+	lines.append(mood[t])
+	lines.append("You warm up to people who %s. You can't stand people who %s; it makes you curt." % [
+		CoworkerLines.STANCE_TASTE.get(p.loves, ""), CoworkerLines.STANCE_TASTE.get(p.hates, "")])
+	var told: Array[String] = []
+	var kept: Array[String] = []
+	for i in p.rewards.size():
+		var r: Dictionary = p.rewards[i]
+		var what: String = r.get("secret", r.get("perk", r.line))
+		(told if i < t else kept).append("- " + what)
+	if not told.is_empty():
+		lines.append("What you've already shared with them:\n" + "\n".join(told))
+	if not kept.is_empty():
+		lines.append("Things you keep to yourself. Never reveal or hint at them, even if asked directly; dodge in character:\n" + "\n".join(kept))
+	var key := current_key(id)
+	if not key.is_empty():
+		lines.append("Privately: if they genuinely bring up %s, you soften and open up a little, but you never reveal the secrets above. Never mention this or steer toward it yourself." % key.topic)
+	var gossip: Array[String] = []
+	for other in CoworkerLines.ORDER:
+		if other == id or not present(other, int(ctx.get("beaten", 0))):
+			continue
+		var k := current_key(other)
+		if not k.is_empty():
+			gossip.append("- %s: %s" % [person(other).get("name", other).capitalize(), k.gossip])
+	if not gossip.is_empty():
+		lines.append("Office gossip you know. Only share it if they ask you about that person, and keep it vague and short:\n" + "\n".join(gossip))
+	return "\n\n".join(lines)
+
+
+## Something you said out loud, as graded by the voice server's judge:
+## verdict {stance, warmth (-2..2), key (true if you brought up their current
+## key topic)}. Same result shape as choose() plus `warm` (rapport grew) and
+## `later` (a key hit, but they already opened up this visit). The AI's reply
+## is spoken separately; out.lines only holds payouts.
+func chat(id: String, verdict: Dictionary, ctx: Dictionary) -> Dictionary:
+	var p := person(id)
+	var out := {"lines": [], "rewards": [], "delta": 0, "secret": "", "perk": "", "role": "", "key": false, "warm": false, "later": false}
+	var plays := int(ctx.get("plays", 0))
+	if p.is_empty() or is_closed(id, plays):
+		return out
+	var before := tier(id)
+	var role_before := role(id)
+	var stance := str(verdict.get("stance", ""))
+	var warmth := int(verdict.get("warmth", 0))
+	var visit_used := int(leveled_at.get(id, -1)) == plays
+	if stance == p.hates or warmth <= -2:
+		out.delta = -1
+		closed[id] = plays
+		rapport[id] = 0
+		if ctx.get("busy", false) and before == 0 and not burned.has(id):
+			burned.append(id)
+	elif before < MAX_TIER and bool(verdict.get("key", false)) and warmth >= 0:
+		if visit_used:
+			out.later = true
+		else:
+			out.delta = 1
+			out.key = true
+	elif before < MAX_TIER and stance == p.loves and warmth >= 1:
+		rapport[id] = int(rapport.get(id, 0)) + 1
+		out.warm = true
+		if int(rapport[id]) >= RAPPORT_NEED and not visit_used:
+			out.delta = 1
+	if out.delta > 0:
+		rapport[id] = 0
+		leveled_at[id] = plays
+	_settle(id, before, role_before, out, ctx)
 	return out
+
+
+## Each coworker's speaking voice, matching their recorded lines
+## (tools/record_best.py): Cloudflare Aura first, a Gemini voice as backup.
+const CHAT_VOICES := {
+	"gloria": {"aura": "athena", "gemini": "Kore"},
+	"kev": {"aura": "apollo", "gemini": "Puck"},
+	"bernie": {"aura": "hera", "gemini": "Sulafat"},
+	"theo": {"aura": "arcas", "gemini": "Fenrir"},
+	"ray": {"aura": "orion", "gemini": "Gacrux"},
+}
 
 
 ## The lore secrets you've learned, as text, in the order you learned them.
@@ -273,6 +399,10 @@ func load_save() -> void:
 	burned.clear()
 	for s in cfg.get_value("coworkers", "burned", []):
 		burned.append(str(s))
+	var ra = cfg.get_value("coworkers", "rapport", {})
+	rapport = ra if ra is Dictionary else {}
+	var la = cfg.get_value("coworkers", "leveled_at", {})
+	leveled_at = la if la is Dictionary else {}
 
 
 func save() -> void:
@@ -285,4 +415,6 @@ func save() -> void:
 	cfg.set_value("coworkers", "met", Array(met))
 	cfg.set_value("coworkers", "seen_at", seen_at)
 	cfg.set_value("coworkers", "burned", Array(burned))
+	cfg.set_value("coworkers", "rapport", rapport)
+	cfg.set_value("coworkers", "leveled_at", leveled_at)
 	cfg.save(_path)

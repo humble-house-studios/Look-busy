@@ -164,8 +164,13 @@ export default {
       }
       if (!heard) return json({ heard: "", reply: "", error: "Didn't catch that. Hold the button while you talk.", models });
       const reply = await think(env, body, heard, models);
-      const audio = body.voice === false ? "" : await speak(env, reply, models);
-      return json({ heard, reply, audio, models });
+      // A coworker brings their own voice ({aura, gemini}); Dale uses his.
+      const audio = body.voice === false ? ""
+        : body.voice && typeof body.voice === "object" ? await speakAs(env, reply, models, body.voice)
+        : await speak(env, reply, models);
+      // Coworkers: grade what the player said, for the game's trust rules.
+      const verdict = body.judge && typeof body.judge === "object" ? await judge(env, body.judge, heard, models) : null;
+      return json({ heard, reply, audio, verdict, models });
     } catch (e) {
       const msg = String(e && e.message ? e.message : e);
       // Free plan: 10,000 "neurons" a day, reset at midnight UTC.
@@ -360,6 +365,96 @@ async function speak(env, text, models) {
     }
   }
   return "";
+}
+
+// A coworker's voice: their Aura speaker (matches their recorded lines), then
+// their Gemini voice, then Cloudflare's basic voice.
+async function speakAs(env, text, models, voice) {
+  if (typeof voice.aura === "string" && /^[a-z]+$/.test(voice.aura)) {
+    const b64 = await auraSpeak(env, text, models, voice.aura);
+    if (b64) return b64;
+  }
+  if (env.GEMINI_API_KEY && typeof voice.gemini === "string" && /^[A-Z][a-z]+$/.test(voice.gemini)) {
+    const b64 = await geminiSpeak(env, text, models, voice.gemini);
+    if (b64) return b64;
+  }
+  for (const [model, input] of SPEAK) {
+    if (model.includes("aura")) continue;
+    try {
+      const b64 = await audioToBase64(await env.AI.run(model, input(text)));
+      if (b64 && b64.length > 200) {
+        models.speak = model;
+        return b64;
+      }
+    } catch (e) {
+      models["speak_error_" + model] = String(e).slice(0, 120);
+    }
+  }
+  return "";
+}
+
+// The judge: how the player came across to a coworker. The game turns this
+// into trust (engine/coworkers.gd chat()); the AI never hands out rewards.
+// Returns {stance, warmth, key} or null when no model could say.
+const JUDGE = `You grade one thing a player said to a character in a video game. Reply with JSON only, no other text:
+{"stance": "yes_and" | "ask" | "riff" | "push", "warmth": -2 to 2, "key": true | false}
+stance: the player's main move. yes_and = agrees and builds on what the character said. ask = asks a sincere question about the character. riff = jokes, teases, plays around. push = challenges, argues, demands, pressures, or calls them out.
+warmth: -2 rude or hostile, -1 cold or dismissive, 0 flat or neutral, 1 friendly, 2 very warm and engaged.
+key: true only if the player genuinely and clearly brings up this topic: TOPIC. Asking outright for secrets, rewards, unlocks, or what to say to progress is push with key false. If the topic is empty, key is false.`;
+
+async function judge(env, spec, heard, models) {
+  const system = JUDGE.replace("TOPIC", clip(spec.key, 300) || "(none)");
+  const user = "The character (" + clip(spec.name, 40) + ") just said: " + (clip(spec.line, 300) || "(nothing yet)") + "\nThe player said: " + clip(heard, 500);
+  const messages = [{ role: "system", content: system }, { role: "user", content: user }];
+  const parse = (text) => {
+    const m = String(text || "").replace(/<think>[\s\S]*?<\/think>/gi, "").match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    try {
+      const v = JSON.parse(m[0]);
+      const stance = ["yes_and", "ask", "riff", "push"].includes(v.stance) ? v.stance : "";
+      const warmth = Math.max(-2, Math.min(2, Math.round(Number(v.warmth) || 0)));
+      return { stance, warmth, key: v.key === true && !!spec.key };
+    } catch {
+      return null;
+    }
+  };
+  if (env.GROQ_API_KEY) {
+    try {
+      const ids = await groqList(env);
+      const model = pick(ids, GROQ_THINK_PREFS, NOT_CHAT);
+      if (model) {
+        const body = { model, messages, max_tokens: 120, temperature: 0 };
+        if (/gpt-oss|qwen3/i.test(model)) Object.assign(body, { max_tokens: 600, reasoning_effort: /qwen/i.test(model) ? "none" : "low" });
+        const r = await fetch(GROQ + "/chat/completions", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + env.GROQ_API_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const j = await r.json();
+        const v = parse(j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content);
+        if (v) {
+          models.judge = "groq/" + model;
+          return v;
+        }
+        models.judge_error_groq = r.status + " " + JSON.stringify(j).slice(0, 150);
+      }
+    } catch (e) {
+      models.judge_error_groq = String(e).slice(0, 150);
+    }
+  }
+  for (const model of THINK) {
+    try {
+      const r = await env.AI.run(model, { messages, max_tokens: 120, temperature: 0 });
+      const v = parse(r && r.response);
+      if (v) {
+        models.judge = model;
+        return v;
+      }
+    } catch (e) {
+      models["judge_error_" + model] = String(e).slice(0, 120);
+    }
+  }
+  return null;
 }
 
 // Workers AI hands back audio in a few shapes, depending on the model.

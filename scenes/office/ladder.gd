@@ -905,6 +905,51 @@ func choose(id: String, choice: Dictionary) -> Array:
 	return out.lines
 
 
+## Can you talk out loud with this one? (Coworkers only, not while closed off.)
+func can_chat(id: String) -> bool:
+	return CoworkerLines.CHAT.has(id) and not crew.is_closed(id, state.plays)
+
+
+## What the voice server needs to play this coworker (see Coworkers.chat_spec).
+func chat_spec(id: String, line := "") -> Dictionary:
+	return crew.chat_spec(id, _ctx(), line)
+
+
+## The judge graded something you said out loud. Applies trust (keys,
+## rapport, closing off) and payouts; returns payout lines to show after
+## their spoken reply. A small toast hints how it landed, never the key.
+func chat(id: String, verdict: Dictionary) -> Array:
+	if verdict.is_empty():
+		return []
+	var out := crew.chat(id, verdict, _ctx())
+	for r in out.rewards:
+		state.apply_reward(r)
+	_refresh_machines()
+	var name: String = Coworkers.person(id).name
+	var news: Array[String] = []
+	if out.key:
+		news.append("SOMETHING CLICKED WITH %s." % name)
+	elif out.later:
+		news.append("%s WANTS TO SAY MORE. COME BACK AFTER A MACHINE." % name)
+	elif out.delta > 0:
+		news.append("%s REALLY LIKES TALKING TO YOU." % name)
+	elif out.warm:
+		news.append("%s WARMED UP A LITTLE." % name)
+	if out.secret != "":
+		news.append("SECRET LEARNED (%d/%d)" % [crew.secrets.size(), LadderState.SECRETS_TOTAL])
+	if out.perk != "":
+		news.append(out.perk)
+	if out.delta < 0:
+		news.append("%s CLOSED OFF. PLAY A MACHINE, THEN TRY AGAIN." % name)
+	if out.role != "":
+		news.append(office._busy.role_news(id, out.role))
+	if not news.is_empty():
+		office._toast.text = "\n".join(news)
+		office._toast_time = 4.5
+	_refresh_people()
+	return out.lines
+
+
 ## A talk ended; finished = you read it to the end (not BYE halfway).
 func end_talk(id: String, finished := true) -> void:
 	_talk_id = ""

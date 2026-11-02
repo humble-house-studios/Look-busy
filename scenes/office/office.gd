@@ -413,6 +413,8 @@ var _talk_buttons: VBoxContainer
 var _voice := ""
 ## The reply a controller has highlighted.
 var _talk_pick := 0
+## Coworker payout lines waiting to be read after a spoken reply.
+var _pending: Array = []
 ## Real voice chat with Dale (scenes/office/dale_voice.gd), once the story bit
 ## of a conversation is over: hold TALK, say anything.
 var _voice_chat: Node
@@ -1510,6 +1512,9 @@ func _set_talk(on: bool, who := {}) -> void:
 		_player.global_position = Vector3(node.global_position.x, 0.0, node.global_position.z) + fwd * 1.5
 		_yaw = atan2(fwd.x, fwd.z)
 		_pitch = -0.15
+		# A fresh conversation: the AI shouldn't remember someone else's chat.
+		_voice_chat.history.clear()
+		_pending.clear()
 		if _speaker.is_empty():
 			_dale_alert.visible = false
 			_talk_stats = DaleStory.read_stats()
@@ -1615,6 +1620,9 @@ func _end_buttons() -> void:
 		return
 	# The story bit is done; remember it now, so chatting on doesn't lose it.
 	if not _speaker.is_empty():
+		# Coworkers: talk out loud too (taps above stay the backup).
+		if _voice_chat.available() and _ladder.can_chat(_speaker.id):
+			_add_hold_button()
 		_talk_button("SEE YA", _advance)
 		_talk_pick = 0
 		_show_pick()
@@ -1651,16 +1659,21 @@ func _hold_talk() -> void:
 	_hush()
 	if _voice_chat.start_listening():
 		_chatting = true
-		_talk_name.text = "DALE  -  LISTENING..."
+		_talk_name.text = _who() + "  -  LISTENING..."
 		_hold_button.text = "LISTENING... (LET GO TO SEND)"
 
 
 func _release_talk() -> void:
 	if not _voice_chat.listening():
 		return
-	_voice_chat.stop_listening(_dale_story.persona(_talk_stats, _ladder.state.is_done("reveal")))
+	if _speaker.is_empty() or not _ladder.can_chat(_speaker.id):
+		_voice_chat.stop_listening(_dale_story.persona(_talk_stats, _ladder.state.is_done("reveal")))
+	else:
+		# A coworker: their own brief and voice, and a judge for what you said.
+		var spec: Dictionary = _ladder.chat_spec(_speaker.id, _talk_text.text)
+		_voice_chat.stop_listening(spec.persona, {"judge": spec.judge, "voice": spec.voice})
 	if _voice_chat.busy:
-		_talk_name.text = "DALE  -  THINKING..."
+		_talk_name.text = _who() + "  -  THINKING..."
 		_hold_button.text = "..."
 		_hold_button.disabled = true
 
@@ -1670,6 +1683,19 @@ func _on_dale_replied(heard: String, reply: String) -> void:
 		return
 	_talk_name.text = "YOU: " + heard.to_upper().left(60)
 	_say(reply, not _voice_chat.speaking())
+	if not _speaker.is_empty() and CoworkerLines.CHAT.has(_speaker.id):
+		# How it landed: trust, and any payout lines to read after their reply.
+		_pending = _ladder.chat(_speaker.id, _voice_chat.last_verdict)
+		if not _pending.is_empty():
+			for c in _talk_buttons.get_children():
+				c.queue_free()
+			_talk_button("NEXT >>", _next_pending)
+			_talk_pick = 0
+			_show_pick()
+			return
+		if not _ladder.can_chat(_speaker.id):
+			_chat_buttons()
+			return
 	_reset_hold_button()
 
 
@@ -1678,11 +1704,44 @@ func _on_dale_failed(message: String) -> void:
 		return
 	# The mic readout (how long you held, how much sound arrived) helps tell a
 	# blocked mic from a quiet one.
-	_talk_name.text = "DALE" + ("   [%s]" % _voice_chat.mic_report if _voice_chat.mic_report != "" else "")
+	_talk_name.text = _who() + ("   [%s]" % _voice_chat.mic_report if _voice_chat.mic_report != "" else "")
 	_voice_chat.mic_report = ""
 	_say(message, false)
 	_voice_chat.play_line(message)
 	_reset_hold_button()
+
+
+## Who you're talking to, for the talk box's name line.
+func _who() -> String:
+	if _speaker.is_empty():
+		return "DALE"
+	return str(Coworkers.person(_speaker.id).get("name", "")) if CoworkerLines.PEOPLE.has(_speaker.id) else "DALE"
+
+
+## After a coworker's spoken reply: their payout lines (a bonus, a secret, a
+## perk), one per NEXT, each in their recorded voice.
+func _next_pending() -> void:
+	if _talk_text.visible_characters >= 0 and _talk_text.visible_characters < _talk_text.text.length():
+		_talk_text.visible_characters = -1
+		return
+	if _pending.is_empty():
+		_chat_buttons()
+		return
+	_talk_name.text = _who()
+	_say(str(_pending.pop_front()))
+	if _pending.is_empty():
+		_chat_buttons()
+
+
+## The buttons while chatting: HOLD TO TALK (if they'll still talk) and SEE YA.
+func _chat_buttons() -> void:
+	for c in _talk_buttons.get_children():
+		c.queue_free()
+	if _voice_chat.available() and (_speaker.is_empty() or _ladder.can_chat(_speaker.id)):
+		_add_hold_button()
+	_talk_button("SEE YA", _advance)
+	_talk_pick = 0
+	_show_pick()
 
 
 func _reset_hold_button() -> void:

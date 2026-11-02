@@ -252,3 +252,76 @@ const BUSY := {
 
 ## How the stance tags read on the reply buttons.
 const STANCE_TAG := {"yes_and": "YES, AND", "ask": "ASK", "riff": "RIFF", "push": "PUSH"}
+
+## Talking out loud (HOLD TO TALK): who each coworker is for the AI, and three
+## hidden keys, one per trust tier. Bringing a key up genuinely (the voice
+## server's judge decides) opens them up a tier, once per visit. Keys are never
+## shown on screen: the only hints are `gossip`, which the OTHER coworkers know
+## and let slip, vaguely, if you ask them about this person. Rules:
+## engine/coworkers.gd chat(). Tap replies still work as a backup.
+const CHAT := {
+	"gloria": {
+		"who": "Gloria, the QA lead, eleven years at the studio, dry and guarded, quietly proud of being the best bug-finder alive. She spends every break at the claw machine.",
+		"keys": [
+			{"topic": "the claw machine: why she keeps playing it, what it means to her, her eleven years at it",
+				"gossip": "Gloria's fed that claw for eleven years. Nobody ever asks her why."},
+			{"topic": "the studio's early days: its first week, day one, or the very first game she tested",
+				"gossip": "Gloria was here day one. Before the carpet. She gets a look when the old days come up."},
+			{"topic": "her trick for reading the claw: its rhythm, its pattern, how she knows when it will grab",
+				"gossip": "Gloria swears that claw has a rhythm. She's never told anyone what it is."},
+		],
+	},
+	"kev": {
+		"who": "Kev, the intern, a hyper, sweet, overconfident bro who calls everyone 'bro', loves the coin pusher and plans to be a millionaire by thirty on vibes.",
+		"keys": [
+			{"topic": "his coin pusher strategy or his big plan to get rich, played along with enthusiastically",
+				"gossip": "Kev thinks the coin pusher is basically the stock market. Get him going on it."},
+			{"topic": "the rumor he's the CEO's nephew: his family, his uncle, or how he really got the internship",
+				"gossip": "Everyone whispers Kev's the CEO's nephew. Nobody's asked him how that feels."},
+			{"topic": "stocks, investing, his group chat tips, or the trading floor upstairs",
+				"gossip": "Kev's group chat is all stock tips. Mention the trading floor and he lights up."},
+		],
+	},
+	"bernie": {
+		"who": "Bernie, HR, warm but deadpan and a bit chaotic, who unwinds by flinging a crash-test dummy that looks exactly like Dale.",
+		"keys": [
+			{"topic": "a joke about the Dale-shaped stress dummy or about flinging it",
+				"gossip": "Bernie's dummy looks exactly like Dale. Make a joke about it and she's yours."},
+			{"topic": "Dale himself: his fifteen years here, his anniversary cake, or the card she's writing",
+				"gossip": "Bernie's writing Dale's fifteen-year cake card. She's been digging into his file."},
+			{"topic": "the boardroom upstairs, pitching the board, or getting promoted",
+				"gossip": "Bernie has pull in the boardroom. She'd help someone pitching up there."},
+		],
+	},
+	"theo": {
+		"who": "Theo, your rival, two years at the studio, prickly, competitive, all business, fixated on the promotion, secretly a gifted cook. He hoards prize tickets at the counter.",
+		"keys": [
+			{"topic": "competing with him for the promotion: standing up to him, calling him out, or a challenge",
+				"gossip": "Theo only respects people who push back. Be nice and he tunes out."},
+			{"topic": "cooking or food: what he'd do if he weren't chasing the promotion, his real passion",
+				"gossip": "Theo always smells like garlic and fresh basil. Late nights in some kitchen, I bet."},
+			{"topic": "the board vote: asking for his support when you pitch the board",
+				"gossip": "Theo's got a vote in the boardroom. You'd have to ask him straight."},
+		],
+	},
+	"ray": {
+		"who": "Ray, the night janitor, thirty years sweeping this building, gentle, slow-talking, full of old stories, who only comes out once the arcade lights dim.",
+		"keys": [
+			{"topic": "the building's history or his thirty years taking care of it",
+				"gossip": "Ray's been here longer than this place has been an office. Ask about the old days."},
+			{"topic": "the laughter he used to hear through the walls: old shows, comedians, stand-up",
+				"gossip": "Ray hums old stand-up bits while he mops. Swears the walls still laugh."},
+			{"topic": "the basement, the stuff stored down there, or the keys he carries",
+				"gossip": "Ray has keys to everything. Even the basement nobody goes in."},
+		],
+	},
+}
+
+## How each stance reads to the AI judge, and how a coworker's tastes are put
+## to them (what they warm to, what they can't stand).
+const STANCE_TASTE := {
+	"yes_and": "go along with them and build on what they say",
+	"ask": "ask sincere questions about them",
+	"riff": "joke around and tease playfully",
+	"push": "push back, challenge them and call them out",
+}
