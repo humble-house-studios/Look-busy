@@ -1,6 +1,8 @@
 extends SceneTree
 ## Debug walkthrough of Look Busy (docs/look-busy.md), headless or under xvfb.
 ## Fresh saves, Look Busy on, then:
+##  - the title screen and CLOCK IN, the slack meter, the boss countdown,
+##    a close call and the all-clear;
 ##  - the morning card, the clock running, the boss coming in through the
 ##    door, walking the route and leaving;
 ##  - sitting at your desk while the boss watches: suspicion climbs to a
@@ -27,13 +29,32 @@ func _init() -> void:
 	busy.set_enabled(true)
 	office._touch = true
 	await frames(10)
-	check(busy.notice.visible and paused, "morning card shows and pauses")
-	press_first()
+	var title = busy.title_screen
+	check(title.visible and paused and not busy.notice.visible, "the title screen shows first and pauses")
+	check(title._go.text == "CLOCK IN", "a fresh start says CLOCK IN")
+	title._options.pressed.emit()
+	await frames(3)
+	check(office._menu.visible and not title.visible, "OPTIONS opens the pause menu")
+	office.close_menu(false)
+	await frames(3)
+	check(title.visible and paused, "closing it comes back to the title")
+	title._go.pressed.emit()
 	await frames(5)
-	check(not paused, "CLOCK IN resumes")
+	check(not title.visible and not paused, "CLOCK IN starts the day")
+	check(not busy.notice.visible and office._toast.text.begins_with("MONDAY"), "the morning card shrinks to news (%s)" % office._toast.text.replace("\n", " / "))
 	var m0: float = busy.wd.minutes
 	await frames(60)
 	check(busy.wd.minutes > m0, "the clock runs (%s)" % busy.wd.clock_text())
+	check(is_equal_approx(busy.wd.slacked, Workday.MORNING_COFFEE), "walking around isn't slacking (%.1f)" % busy.wd.slacked)
+	check(busy.wd.next_visit_in() > 0.0, "the boss countdown runs (%.1f s)" % busy.wd.next_visit_in())
+	office._set_seat(office._computers[0])
+	await frames(60)
+	check(busy.wd.slacked > Workday.MORNING_COFFEE + 1.0, "playing fills the slack meter (%s)" % Workday.hours_text(busy.wd.slacked))
+	var stand: Button = office._stand_button
+	var hud_top: float = busy._hud.position.y
+	check(office._hud.size.x > office._hud.size.y or hud_top >= stand.position.y + stand.size.y, "seated upright, the HUD sits under the buttons (%.0f)" % hud_top)
+	office._set_seat(null)
+	await frames(5)
 
 	# The boss comes by: through the door, along the route.
 	busy.dev_boss_now()
@@ -80,6 +101,32 @@ func _init() -> void:
 		if busy.notice.visible:
 			press_first()
 	check(busy._visit_t < 0.0 and not busy._boss_node.visible, "the boss leaves")
+
+	# Another visit: alt-tab with the boss right there = a close call; then
+	# the all-clear when they leave.
+	busy.wd.suspicion = 0.0
+	busy.wd._grace = 0.0
+	office._set_seat(main_pc)
+	busy.dev_boss_now()
+	var close := false
+	for i in 1200:
+		await process_frame
+		if busy._boss_close():
+			close = true
+			break
+	check(close and busy._danger > 0.0, "the boss closes in (danger %.2f)" % busy._danger)
+	var slack0: float = busy.wd.slacked
+	busy.alt_tab()
+	check(busy.wd.close_calls == 1 and busy.wd.slacked >= slack0 + Workday.CLOSE_CALL, "alt-tab just in time = a close call")
+	for i in 3000:
+		await process_frame
+		if busy._visit_t < 0.0:
+			break
+		if busy.notice.visible:
+			press_first()
+	check(office._toast.text.contains("COAST IS CLEAR"), "the all-clear when the boss leaves (%s)" % office._toast.text.replace("\n", " / "))
+	office._set_seat(null)
+	await frames(5)
 
 	# Coworkers: a lookout coughs and covers an empty desk; a snitch tips off the boss.
 	var crew: Coworkers = office._ladder.crew

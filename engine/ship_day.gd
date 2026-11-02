@@ -18,6 +18,10 @@ const ROLE_BIAS := {"collaborator": 2.0, "lookout": 1.0, "": 0.0, "snitch": -3.0
 const TOKENS_PER_POINT := 4
 const BEAT_THEO_TOKENS := 15
 const TICKETS_PER_SCORE := 1
+## Hours slacked this week count as research: points on your game's score,
+## plus a bonus for each day the slack quota was met.
+const RESEARCH_PER_HOUR := 2
+const RESEARCH_PER_QUOTA := 5
 
 const PRESS_QUOTES := {
 	"rave": ["\"%s is the game of the year. Of this week, anyway.\"", "\"We stopped working to play %s. Our boss noticed.\"", "\"%s: a triumph. Cried twice.\""],
@@ -36,12 +40,15 @@ const CREW_QUOTES := {
 ## Your week's reviews. build: kind -> piece (GameMaker.build). crew: {id:
 ## role} for coworkers you've met (Theo is the rival, so he doesn't review).
 ## Returns {title, score, press: [{who, score, quote}], crew: [...],
-## press_avg, theo: {title, score}, beat_theo, promoted, tokens, tickets}.
-static func review(build: Dictionary, crew: Dictionary, floor_n: int, week: int) -> Dictionary:
+## press_avg, theo: {title, score}, beat_theo, promoted, tokens, tickets,
+## research}. research_pts: points from research() (only counts if you shipped).
+static func review(build: Dictionary, crew: Dictionary, floor_n: int, week: int, research_pts := 0) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([week, floor_n, build])
 	var shipped := not build.is_empty()
 	var s := GameMaker.score_of(build) if shipped else {"score": 0}
+	var bonus := maxi(0, research_pts) if shipped else 0
+	s = {"score": int(s.score) + bonus}
 	var title := GameMaker.title_of(build) if shipped else "NOTHING"
 	var par: float = PAR[clampi(floor_n, 1, PAR.size()) - 1]
 	var quality := clampf(float(s.score) / par * 7.0, 0.0, 10.0) if shipped else 0.0
@@ -74,7 +81,13 @@ static func review(build: Dictionary, crew: Dictionary, floor_n: int, week: int)
 		"title": title, "score": int(s.score), "shipped": shipped, "press": press, "crew": reviews,
 		"press_avg": press_avg, "theo": {"title": theo_spec[0], "score": theo_score},
 		"beat_theo": beat, "promoted": promoted, "tokens": tokens, "tickets": int(s.score) * TICKETS_PER_SCORE,
+		"research": bonus,
 	}
+
+
+## Research points for a week: game minutes slacked and quota days.
+static func research(slacked_minutes: float, quota_days: int) -> int:
+	return int(slacked_minutes / 60.0) * RESEARCH_PER_HOUR + quota_days * RESEARCH_PER_QUOTA
 
 
 ## "8.3" style.

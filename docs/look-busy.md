@@ -161,3 +161,41 @@ you walk away with.
 **Dale's payoff:** he's outside with you in the final scene, maybe the one who
 brings the guitar. The founder who was scared of the top chooses people over the
 corner office, which is the ending's message in one character.
+
+## Fun pass (2026-11-02)
+
+A full playthrough of the office with Look Busy on turned up four problems.
+Each change below fixes one of them, and each is based on research on what
+keeps people playing.
+
+**What was wrong:**
+
+- The first screen was a wall of text (bosses, times, strikes, crew).
+- Playing a desk game earned nothing moment to moment. The only reward was
+  a piece when you beat a whole desk, which can take minutes.
+- Seated, you face the screen, so the boss is behind you. Footsteps were the
+  only warning, and Safari often has the sound off.
+- Seated upright, the clock HUD sat on top of STAND UP and ALT-TAB.
+
+**What changed, and why:**
+
+| Change | Why it works |
+|---|---|
+| **Title screen with a looping cartoon:** play, boss, alt-tab, safe; next loop too slow, strike; then your game ships. Three rules in words. | Show, don't tell: players learn a loop faster by watching it than by reading it. Most mobile players who leave never come back (typical day-1 retention is roughly 25–40%), so the first 30 seconds matter most. Nothing past floor 1 is named; "Nobody has seen the top one" opens a curiosity gap (Loewenstein, 1994) without spoiling Dale, the ladder or the club. |
+| **Slack meter + daily quota:** every second at a game unseen fills it. | Clear goals and immediate feedback are the core conditions for flow (Csikszentmihalyi). It turns the whole day into a risk/reward meter: slack versus suspicion. |
+| **The day starts with 0:15 of "coffee" already on the meter.** | Endowed progress (Nunes & Drèze, 2006): car-wash cards with 2 of 10 stamps already filled were completed 34% of the time, versus 19% for cards with 8 stamps needed and none filled. A head start makes the goal feel reachable. |
+| **Quota bar + "GAME n/5" on the HUD.** | Goal gradient (Kivetz et al., 2006): people speed up as a goal gets close. A visible bar pulls players through the day. |
+| **Countdown to the next visit ("MARGE WALKS BY IN 0:42").** | It's the comedy game's "NEXT IN 3s: Heckler" in office form. Telegraphing a threat makes it fair and learnable (Pac-Man ghosts, Hitman routes). Tension comes from the countdown, not from being surprised. |
+| **Red screen edges toward the boss, throbbing ALT-TAB button; green edges while you're working in front of them.** | Stealth games use edge indicators to show which way a threat is. Seated, the boss is behind you, so the edges show what the camera can't. It also works with the sound off. |
+| **Close call:** alt-tab with the boss within 4 m = +0:10 and a ding. **"COAST IS CLEAR"** when they leave. | Near misses activate the brain's reward system and raise the urge to keep playing (Clark et al., 2009). The all-clear completes the tension/release beat, the same red-light/green-light rhythm as Five Nights at Freddy's (watch the screen, manage the threat). |
+| **Slack becomes research:** +2 points on your game per hour slacked, +5 per quota day. | It ties the moment-to-moment loop to the week's goal, so slacking is how you make your game. Strikes are losses, which weigh roughly twice as much as gains (Kahneman & Tversky), so the meter you protect matters. |
+| **Morning card shortened. After the title, the first morning is one line of news.** | It cuts the number of screens before you can play: the title already taught the rules. |
+| **Records on the title (best day, best floor, times fired).** | A score to beat gives each 5-minute day a reason to replay. 5 minutes matches typical mobile session lengths. |
+
+**Comparable games:** Five Nights at Freddy's (a screen plus a threat you
+watch for), Untitled Goose Game (comedy stealth), Papers, Please (a job under
+pressure), and the real 90s "boss key" that swapped a DOS game for a fake
+spreadsheet.
+
+**Next playtest:** do players alt-tab in time on their first Marge visit, do
+they laugh at the strike stamp, and do they press GO HOME for a second day?

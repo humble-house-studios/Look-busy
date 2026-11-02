@@ -28,6 +28,13 @@ extends Node
 ##     and coworker reviews, Theo ships his game, the reviews pay out (arcade
 ##     tokens and tickets), and a good week promotes you to the next floor and
 ##     its boss.
+##   - The title screen (scenes/office/busy_title.gd) opens once per launch
+##     and shows the loop as a cartoon before you clock in.
+##   - The slack meter: playing a game while the boss can't see you fills it
+##     toward the day's quota; alt-tabbing with the boss right there is a
+##     close call (bonus slack); slack becomes research on Friday.
+##   - The HUD counts down to the boss's next visit, and while they're on
+##     the floor the screen edges glow red on the side they're on.
 ## Rules: engine/workday.gd. The pop-ups: scenes/office/busy_notice.gd.
 
 const Notice := preload("res://scenes/office/busy_notice.gd")
@@ -37,7 +44,9 @@ const EYE := 1.6
 const STEP_EVERY := 0.52
 const REFLECT_RANGE := 3.5
 const HUD_W := 300.0
-const HUD_H := 70.0
+const HUD_H := 118.0
+## Bosses (and first-time tips) already introduced: user://look_busy.cfg, [seen].
+const SEEN_SECTION := "seen"
 const CREAK := preload("res://audio/creak.wav")
 const COUGH := preload("res://audio/cough.wav")
 const BUSTED := preload("res://audio/busted.wav")
@@ -79,6 +88,16 @@ var _kit_vp: SubViewport
 var _kit: Control
 var _kit_pc
 var _piece_t := 0.0
+var title_screen: Control
+var _title_done := false
+var _edge: Control
+## How close the boss is (0..1), and which screen edges they're behind
+## (left, right, top, bottom weights).
+var _danger := 0.0
+var _danger_dir := Vector4.ONE
+var _close_done := false
+var _visit_strike := false
+var _visit_here := false
 ## Desk the DEV KIT sits on: right wall, by the door, facing into the room.
 const KIT_DESK := Vector3(3.05, 0.0, 2.95)
 
@@ -116,6 +135,13 @@ func build() -> void:
 		var root: Node3D = office._ladder._person("office", "boss_" + b.id, Vector3(DOOR.x, 0, DOOR.z + 1.2), PI, b.look_body)
 		root.visible = false
 		_bosses[b.id] = root
+	# The danger glow sits under the rest of the HUD.
+	_edge = Control.new()
+	_edge.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_edge.draw.connect(_draw_edge)
+	office._hud.add_child(_edge)
+	office._hud.move_child(_edge, 0)
 	_hud = Control.new()
 	_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hud.draw.connect(_draw_hud)
@@ -127,6 +153,11 @@ func build() -> void:
 	notice = Notice.new()
 	notice.office = office
 	office.add_child(notice)
+	title_screen = preload("res://scenes/office/busy_title.gd").new()
+	title_screen.office = office
+	title_screen.busy = self
+	office.add_child(title_screen)
+	title_screen.clocked_in.connect(_on_clock_in)
 	_build_kit()
 
 
@@ -176,12 +207,19 @@ func set_enabled(on: bool) -> void:
 	if not on:
 		if office and office._title:
 			office._title.visible = true
+		if title_screen and (title_screen.visible or title_screen._waiting_menu):
+			title_screen.close()
+		_title_done = true
 		uncover()
 		_end_visit()
 		_call_t = -1.0
 		_ring.stop()
 	if _hud:
 		_hud.visible = on
+	if _edge:
+		_edge.visible = on
+	if not on and office and office._hud:
+		office._apply_insets(true)
 	_show_kit(on)
 	if not on and office and office._seat == _kit_pc and _kit_pc != null:
 		office._set_seat(null)
@@ -196,6 +234,10 @@ func tick(delta: float) -> void:
 	_place_hud()
 	# The morning card replaces the office's own "MONDAY, 9:02 AM" title.
 	office._title.visible = false
+	if not _title_done:
+		if not title_screen.visible and not title_screen._waiting_menu and not notice.visible:
+			title_screen.open()
+		return
 	if not _morning_shown and wd.minutes <= 0.0 and not notice.visible and not wd.fired:
 		_morning()
 		return
@@ -218,6 +260,9 @@ func tick(delta: float) -> void:
 	var level := wd.watch(delta, _activity(), _seen, _visit_t >= 0.0 or _connected)
 	if level != "":
 		_caught(level)
+	if wd.slack(delta, _activity(), _seen):
+		_quota_met()
+	_tick_danger(delta)
 	_flash = maxf(0.0, _flash - delta)
 	_piece_t -= delta
 	if _piece_t <= 0.0:
@@ -236,10 +281,18 @@ func tick(delta: float) -> void:
 			want = 1.0 - d / REFLECT_RANGE
 	_reflect = move_toward(_reflect, want, delta * 2.0)
 	_alt_button.visible = office._seat != null and not office._pad
-	_alt_button.text = "BACK TO\nTHE GAME" if is_covered() else "ALT-TAB"
+	_alt_button.text = "BACK TO\nTHE GAME" if is_covered() else ("ALT-TAB!" if _danger > 0.0 else "ALT-TAB")
 	_alt_button.add_theme_font_size_override("font_size", 16 if is_covered() else 22)
+	# The button throbs while the boss is around and your game is showing.
+	var urgent := _danger > 0.0 and not is_covered()
+	var beat := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 1000.0 * (6.0 + 8.0 * _danger))
+	_alt_button.modulate = Color(1, 1, 1).lerp(Color(1.0, 0.35, 0.25), beat * 0.8) if urgent else Color(1, 1, 1)
+	_alt_button.pivot_offset = _alt_button.size * 0.5
+	var sc := 1.0 + (0.08 * beat * _danger if urgent else 0.0)
+	_alt_button.scale = Vector2(sc, sc)
 	_place_hud()
 	_hud.queue_redraw()
+	_edge.queue_redraw()
 	_tick_wall_clock()
 
 
@@ -289,6 +342,10 @@ func _start_visit() -> void:
 		_call_t = 0.0
 		_connected = false
 		_desk_checked = false
+		_close_done = false
+		_visit_strike = false
+		_visit_here = true
+		_first_meeting(b)
 		return
 	_end_visit()
 	_boss_node = _bosses.get(b.id)
@@ -297,7 +354,11 @@ func _start_visit() -> void:
 	_visit_t = 0.0
 	_desk_checked = false
 	_boss_node.visible = true
+	_close_done = false
+	_visit_strike = false
+	_visit_here = _in_office()
 	office._ladder.peek_arcade(true)
+	_first_meeting(b)
 
 
 func _end_visit() -> void:
@@ -321,6 +382,7 @@ func _tick_visit(delta: float) -> void:
 	var pa := Workday.patrol_at(BusyLines.ROUTE, float(b.speed), _visit_t)
 	if pa.done:
 		_end_visit()
+		_coast_clear(b)
 		return
 	_boss_pos = pa.pos
 	_boss_yaw = pa.yaw
@@ -377,6 +439,7 @@ func _tick_call(delta: float) -> void:
 	if _call_t >= ring + float(b.get("call", 5.0)):
 		_call_t = -1.0
 		_connected = false
+		_coast_clear(b)
 		return
 	_seen = office._seat != null
 
@@ -397,6 +460,109 @@ func _empty_desk() -> void:
 	var level := wd.add(Workday.EMPTY_DESK)
 	if level != "":
 		_caught(level)
+
+
+## The first time you meet each boss: who they are and what to do.
+func _first_meeting(b: Dictionary) -> void:
+	var cfg := ConfigFile.new()
+	cfg.load(Workday.SAVE_PATH)
+	if cfg.get_value(SEEN_SECTION, b.id, false):
+		return
+	cfg.set_value(SEEN_SECTION, b.id, true)
+	cfg.save(Workday.SAVE_PATH)
+	if b.kind == "call":
+		office._toast.text = "%s IS CALLING YOUR SCREEN.\nSIT AT A DESK AND ALT-TAB BEFORE HE PICKS UP!" % b.name
+	else:
+		office._toast.text = "THAT'S %s, YOUR BOSS.\nIF SHE SEES YOU PLAYING, ALT-TAB!" % b.name if b.id == "marge" else "THAT'S %s.\nDON'T GET SEEN PLAYING." % b.name
+	office._toast_time = 5.0
+
+
+## The boss is gone and you got away with it: back to playing.
+func _coast_clear(b: Dictionary) -> void:
+	if _visit_strike or wd.fired or not _visit_here:
+		return
+	office._toast.text = "%s IS GONE. COAST IS CLEAR!\nBACK TO PLAYING." % b.name
+	office._toast_time = 3.0
+	_play(preload("res://audio/chime.wav"), -6.0)
+
+
+func _quota_met() -> void:
+	office._toast.text = "SLACK QUOTA MET! (%s)\nEVERY EXTRA MINUTE IS RESEARCH FOR YOUR GAME." % Workday.hours_text(wd.quota())
+	office._toast_time = 4.0
+	_play(preload("res://audio/jackpot.wav"), -4.0)
+
+
+## Alt-tabbed with the boss right on you and got away with it.
+func _close_call() -> void:
+	_close_done = true
+	var met := wd.close_call()
+	office._toast.text = "CLOSE CALL! +%s SLACKED" % Workday.hours_text(Workday.CLOSE_CALL)
+	office._toast_time = 2.5
+	_play(preload("res://audio/ding.wav"), -2.0)
+	if met:
+		_quota_met()
+
+
+## Is the boss on you right now (close enough for a close call)?
+func _boss_close() -> bool:
+	if _call_t >= 0.0:
+		return not _connected
+	if _visit_t < 0.0 or not _in_office():
+		return false
+	var cam: Vector3 = office._camera.global_position
+	return Vector2(cam.x, cam.z).distance_to(_boss_pos) < Workday.CLOSE_RANGE
+
+
+## How much danger to show at the screen edges, and from which side.
+func _tick_danger(delta: float) -> void:
+	var want := 0.0
+	var dir := Vector4.ONE
+	if _call_t >= 0.0 and office._seat:
+		want = 1.0 if _connected else 0.6
+	elif _visit_t >= 0.0 and _in_office():
+		var cam: Node3D = office._camera
+		var at := Vector2(cam.global_position.x, cam.global_position.z)
+		var d := at.distance_to(_boss_pos)
+		want = clampf(1.0 - (d - 1.0) / 7.0, 0.2, 1.0)
+		var to := (_boss_pos - at).normalized()
+		var bz: Vector3 = cam.global_transform.basis.z
+		var bxv: Vector3 = cam.global_transform.basis.x
+		var fwd := Vector2(-bz.x, -bz.z).normalized()
+		var right := Vector2(bxv.x, bxv.z).normalized()
+		var side := to.dot(right)
+		var front := to.dot(fwd)
+		dir = Vector4(maxf(0.0, -side), maxf(0.0, side), maxf(0.0, front) * 0.5, maxf(0.0, -front)) * 0.75 + Vector4.ONE * 0.25
+	_danger = move_toward(_danger, want, delta * 3.0)
+	_danger_dir = _danger_dir.lerp(dir, minf(1.0, delta * 6.0))
+
+
+func _draw_edge() -> void:
+	if _danger <= 0.01:
+		return
+	var size: Vector2 = office._hud.size
+	var watched := _seen and _activity() != "working"
+	var safe := _seen and _activity() == "working"
+	var col := Color(0.3, 1.0, 0.45) if safe else Color(1.0, 0.12, 0.06)
+	var beat := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 1000.0 * (5.0 + 7.0 * _danger))
+	var a := (0.18 + 0.32 * _danger) * (0.7 + 0.3 * beat)
+	if watched:
+		a = 0.55 + 0.25 * beat
+	elif safe:
+		a = 0.3
+	var d := minf(size.x, size.y) * (0.09 + 0.07 * _danger)
+	var w := [_danger_dir.x, _danger_dir.y, _danger_dir.z, _danger_dir.w]
+	if watched or safe:
+		w = [1.0, 1.0, 1.0, 1.0]
+	var edges := [
+		[Vector2(0, 0), Vector2(0, size.y), Vector2(d, size.y - d), Vector2(d, d)],
+		[Vector2(size.x, size.y), Vector2(size.x, 0), Vector2(size.x - d, d), Vector2(size.x - d, size.y - d)],
+		[Vector2(size.x, 0), Vector2(0, 0), Vector2(d, d), Vector2(size.x - d, d)],
+		[Vector2(0, size.y), Vector2(size.x, size.y), Vector2(size.x - d, size.y - d), Vector2(d, size.y - d)],
+	]
+	for i in 4:
+		var c := Color(col.r, col.g, col.b, a * float(w[i]))
+		var clear := Color(col.r, col.g, col.b, 0.0)
+		_edge.draw_polygon(PackedVector2Array(edges[i]), PackedColorArray([c, c, clear, clear]))
 
 
 # ---------------------------------------------------------------- coworkers
@@ -498,6 +664,7 @@ func _play(stream: AudioStream, db := 0.0) -> void:
 
 func _caught(level: String) -> void:
 	var b := wd.boss()
+	_visit_strike = true
 	_play(BUSTED, -2.0)
 	_flash = 1.5
 	var lines: Array = b[level]
@@ -537,9 +704,12 @@ func _day_end() -> void:
 	if friday:
 		_ship_day()
 		return
-	var body := "Clocked out. Today: %d spreadsheet cells. Strikes: %d/3.\n\nYour game: %s (%d pieces). It ships Friday at 5." % [
-		wd.cells_today, wd.strikes, gm.title() if not gm.build.is_empty() else "nothing yet", gm.pieces.size()]
-	notice.show_notice("CLOCK.EXE", "5:00 PM", body, [["GO HOME", _next_day]], Color(0.06, 0.14, 0.6))
+	var met := wd.quota_met()
+	var body := "SLACKED: %s of %s%s\nBEST DAY EVER: %s\nCLOSE CALLS: %d.  STRIKES: %d/3.\n\nYour game: %s (%d/5 pieces). It ships Friday at 5." % [
+		Workday.hours_text(wd.slacked), Workday.hours_text(wd.quota()), "  QUOTA MET!" if met else "  (quota missed)",
+		Workday.hours_text(wd.best_slack), wd.close_calls, wd.strikes,
+		gm.title() if not gm.build.is_empty() else "nothing yet", gm.build.size()]
+	notice.show_notice("CLOCK.EXE", "5:00 PM", body, [["GO HOME", _next_day]], Color(0.1, 0.5, 0.2) if met else Color(0.06, 0.14, 0.6))
 
 
 # ---------------------------------------------------------------- Friday
@@ -550,13 +720,14 @@ func _ship_day() -> void:
 	var met := {}
 	for id in crew().met:
 		met[id] = crew().role(id)
-	var r := ShipDay.review(gm.build, met, wd.floor_i, wd.week)
+	var r := ShipDay.review(gm.build, met, wd.floor_i, wd.week, ShipDay.research(wd.slacked_week, wd.quota_days))
 	wd.record_ship(r)
 	var lines: Array[String] = []
 	for p in r.press:
 		lines.append("%s  %s/10\n%s" % [p.who, ShipDay.fmt(p.score), p.quote])
 	var head := "YOU SHIPPED\n%s" % r.title if r.shipped else "YOU SHIPPED NOTHING"
-	var body := ("Score %d. Press average %s/10.\n\n" % [r.score, ShipDay.fmt(r.press_avg)]) + "\n\n".join(lines)
+	var research := "  (incl. +%d research: %s slacked)" % [r.research, Workday.hours_text(wd.slacked_week)] if r.research > 0 else ""
+	var body := ("Score %d%s. Press average %s/10.\n\n" % [r.score, research, ShipDay.fmt(r.press_avg)]) + "\n\n".join(lines)
 	notice.show_notice("SHIP.EXE", head, body, [["NEXT: THE OFFICE", _ship_crew.bind(r)]], Color(0.75, 0.2, 0.55))
 
 
@@ -633,12 +804,24 @@ func _go_home() -> void:
 	wd.save()
 
 
+## CLOCK IN on the title: the title already said it all, so the day's card
+## shrinks to a line of news.
+func _on_clock_in() -> void:
+	_title_done = true
+	_play(BELL, -6.0)
+	if wd.minutes <= 0.0 and not wd.fired:
+		_morning_shown = true
+		var b := wd.boss()
+		office._toast.text = "%s, 9:00 AM. BOSS: %s.\nSLACK %s TODAY. DON'T GET CAUGHT." % [BusyLines.DAYS[wd.day], b.name, Workday.hours_text(wd.quota())]
+		office._toast_time = 5.0
+
+
 func _morning() -> void:
 	_morning_shown = true
 	var b := wd.boss()
 	var day: String = BusyLines.DAYS[wd.day]
-	var body := "Floor %d, week %d. %s\n\nBoss: %s\n%s\n\nPlay the desk games, but if the boss sees you playing, suspicion climbs. Full meter = a strike. Three strikes = fired. ALT-TAB (Tab / Y / the button) to a spreadsheet.\n\nCrew: %s" % [
-		wd.floor_i, wd.week, BusyLines.MORNING[wd.day], b.hello, b.habit, crew_text()]
+	var body := "%s\n\nBOSS: %s\n%s\n\nTODAY: SLACK %s (coffee counts: %s already).\nWatch the countdown at the top.\n\n%s" % [
+		BusyLines.MORNING[wd.day], b.hello, b.habit, Workday.hours_text(wd.quota()), Workday.hours_text(wd.slacked), crew_text()]
 	notice.show_notice("MONDAY.EXE" if wd.day == 0 else day + ".EXE", "%s, 9:00 AM" % day, body, [["CLOCK IN", func(): pass]], Color(0.06, 0.14, 0.6))
 
 
@@ -665,6 +848,8 @@ func alt_tab() -> void:
 	pc.set_cover(_sheet_vp)
 	_covered = pc
 	_play(preload("res://audio/click.wav"), -4.0)
+	if not _close_done and _boss_close() and not wd.in_grace() and wd.suspicion < Workday.MAX_SUSPICION:
+		_close_call()
 
 
 func uncover() -> void:
@@ -703,45 +888,94 @@ func _place_hud() -> void:
 	var size: Vector2 = office._hud.size
 	var inset: Vector4 = office._inset
 	var wide := size.x > size.y
-	_hud.position = Vector2((size.x - HUD_W) * 0.5, 14 + inset.y)
+	# Seated upright, STAND UP and ALT-TAB take the top corners: drop below them.
+	var top := 14.0 + inset.y
+	if office._seat and not wide:
+		top = 24.0 + 96.0 + 12.0 + inset.y
+	_hud.position = Vector2((size.x - HUD_W) * 0.5, top)
 	_hud.size = Vector2(HUD_W, HUD_H)
-	# Upright, the TO-DO steps down under the clock.
-	office._todo.offset_top = 24 + inset.y + (0 if wide else 80)
+	var under := top + HUD_H + 12.0
+	# Upright, the TO-DO steps down under the clock; news goes under both.
+	office._todo.offset_top = 24 + inset.y if wide else under
+	office._toast.offset_top = under if wide or office._seat else under + 70.0
 
 
 func _draw_hud() -> void:
 	var font: Font = preload("res://fonts/press_start_2p.ttf")
 	var w := HUD_W
 	var watched := _seen and _activity() != "working"
-	var bg := Color(0.05, 0.04, 0.08, 0.72)
+	var blink := fmod(Time.get_ticks_msec() / 250.0, 2.0) < 1.0
+	var bg := Color(0.05, 0.04, 0.08, 0.78)
 	if _flash > 0.0 and fmod(_flash, 0.3) < 0.15:
 		bg = Color(0.6, 0.05, 0.05, 0.85)
 	_hud.draw_rect(Rect2(Vector2.ZERO, Vector2(w, HUD_H)), bg)
 	_hud.draw_rect(Rect2(Vector2.ZERO, Vector2(w, HUD_H)), Color(1, 1, 1, 0.5), false, 2.0)
 	var b := wd.boss()
+	# Row 1: the clock, and how much of your game you have.
 	_hud.draw_string(font, Vector2(10, 24), wd.clock_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1.0, 0.92, 0.55))
-	_hud.draw_string(font, Vector2(10, 24), "FL%d" % wd.floor_i, HORIZONTAL_ALIGNMENT_RIGHT, w - 20, 12, Color(1, 1, 1, 0.6))
-	# Suspicion bar.
-	var bar := Rect2(10, 36, w - 100, 22)
+	_hud.draw_string(font, Vector2(10, 22), "GAME %d/5" % gm.build.size(), HORIZONTAL_ALIGNMENT_RIGHT, w - 20, 10, Color(1.0, 0.5, 0.82))
+	# Row 2: the slack meter toward today's quota (what you're here for).
+	var sbar := Rect2(10, 32, w - 20, 20)
+	_hud.draw_rect(sbar, Color(0.15, 0.15, 0.18))
+	var sk := clampf(wd.slacked / wd.quota(), 0.0, 1.0)
+	var met := wd.quota_met()
+	_hud.draw_rect(Rect2(sbar.position, Vector2(sbar.size.x * sk, sbar.size.y)), Color(1.0, 0.8, 0.2) if met else Color(0.3, 0.85, 0.35))
+	var stext := "SLACKED %s/%s" % [Workday.hours_text(wd.slacked), Workday.hours_text(wd.quota())]
+	if met:
+		stext = "QUOTA MET! %s" % Workday.hours_text(wd.slacked)
+	_hud.draw_string_outline(font, sbar.position + Vector2(6, 15), stext, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, 4, Color.BLACK)
+	_hud.draw_string(font, sbar.position + Vector2(6, 15), stext, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
+	# Row 3: suspicion and strikes (what can end it).
+	var bar := Rect2(10, 58, w - 100, 20)
 	_hud.draw_rect(bar, Color(0.15, 0.15, 0.18))
 	var k := wd.suspicion / Workday.MAX_SUSPICION
-	var col := Color(0.3, 0.85, 0.35).lerp(Color(1.0, 0.85, 0.2), clampf(k * 2.0, 0.0, 1.0)).lerp(Color(1.0, 0.2, 0.15), clampf(k * 2.0 - 1.0, 0.0, 1.0))
+	var col := Color(1.0, 0.85, 0.2).lerp(Color(1.0, 0.2, 0.15), clampf(k * 1.5, 0.0, 1.0))
 	_hud.draw_rect(Rect2(bar.position, Vector2(bar.size.x * k, bar.size.y)), col)
-	_hud.draw_string(font, bar.position + Vector2(6, 16), "!! WATCHED !!" if watched else "SUSPICION", HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
-			Color(1, 1, 1, 1.0 if watched and fmod(Time.get_ticks_msec() / 250.0, 2.0) < 1.0 else 0.75))
-	# Strikes.
+	_hud.draw_string_outline(font, bar.position + Vector2(6, 15), "SUSPICION", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, 4, Color.BLACK)
+	_hud.draw_string(font, bar.position + Vector2(6, 15), "SUSPICION", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color.WHITE)
 	for i in 3:
-		var r := Rect2(w - 82 + i * 24, 38, 18, 18)
+		var r := Rect2(w - 82 + i * 24, 59, 18, 18)
 		_hud.draw_rect(r, Color(0.85, 0.15, 0.1) if i < wd.strikes else Color(1, 1, 1, 0.15))
 		_hud.draw_rect(r, Color(1, 1, 1, 0.6), false, 2.0)
-	# An incoming video call (the WFH boss).
-	if _call_t >= 0.0:
-		var ringing := not _connected
-		var text := ("INCOMING CALL: %s" % b.name) if ringing else ("ON CALL WITH %s" % b.name)
-		var cr := Rect2(0, HUD_H + 6, w, 34)
-		var on := not ringing or fmod(_call_t, 0.6) < 0.3
-		_hud.draw_rect(cr, Color(0.1, 0.45, 0.2, 0.9) if on else Color(0.05, 0.2, 0.1, 0.9))
-		_hud.draw_string(font, cr.position + Vector2(8, 22), text, HORIZONTAL_ALIGNMENT_LEFT, w - 16, 11, Color.WHITE)
+	# Row 4: the boss. A countdown, then where they are and what to do.
+	var line := ""
+	var band := Color(0, 0, 0, 0)
+	var ink := Color(1, 1, 1, 0.8)
+	if watched:
+		line = "!! %s SEES YOU !!" % b.name
+		band = Color(0.75, 0.08, 0.06) if blink else Color(0.45, 0.04, 0.03)
+		ink = Color.WHITE
+	elif _seen:
+		line = "LOOKING BUSY. NICE."
+		band = Color(0.1, 0.5, 0.2)
+		ink = Color.WHITE
+	elif _call_t >= 0.0:
+		line = ("%s IS CALLING! ALT-TAB!" % b.name) if not _connected else ("ON CALL WITH %s" % b.name)
+		band = Color(0.1, 0.45, 0.2) if blink or _connected else Color(0.05, 0.25, 0.1)
+		ink = Color.WHITE
+	elif _visit_t >= 0.0:
+		var here := _in_office()
+		if office._seat and not is_covered() and here:
+			line = "%s IS HERE. ALT-TAB!" % b.name
+		else:
+			line = "%s IS ON THE FLOOR" % b.name
+		band = Color(0.8, 0.4, 0.05) if blink or not here else Color(0.55, 0.25, 0.03)
+		ink = Color.WHITE
+	else:
+		var left := wd.next_visit_in()
+		var verb := "CALLS" if b.kind == "call" else "WALKS BY"
+		if left < 0.0:
+			line = "%s IS DONE FOR TODAY" % b.name
+			ink = Color(0.5, 1.0, 0.55)
+		else:
+			line = "%s %s IN %d:%02d" % [b.name, verb, int(left) / 60, int(left) % 60]
+			if left < 8.0:
+				band = Color(0.6, 0.35, 0.05) if blink else Color(0.3, 0.17, 0.02)
+				ink = Color.WHITE
+	var lr := Rect2(2, 84, w - 4, HUD_H - 86)
+	if band.a > 0.0:
+		_hud.draw_rect(lr, band)
+	_hud.draw_string(font, Vector2(0, lr.position.y + 21), line, HORIZONTAL_ALIGNMENT_CENTER, w, 11, ink)
 	# The boss's reflection in the glass, seated with them right behind you.
 	if _reflect > 0.01:
 		_draw_reflection()

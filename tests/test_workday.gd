@@ -143,3 +143,62 @@ func test_saves() -> void:
 	assert_eq(again.day, 1)
 	assert_eq(again.strikes, 1)
 	assert_almost_eq(again.minutes, 77.0, 0.01)
+
+
+func test_slack_fills_only_while_playing_unseen() -> void:
+	var w := Workday.new(PATH)
+	assert_eq(w.slacked, Workday.MORNING_COFFEE, "the day starts with a coffee break on the meter")
+	w.slack(10.0, "idle", false)
+	w.slack(10.0, "working", false)
+	w.slack(10.0, "slacking", true)
+	assert_eq(w.slacked, Workday.MORNING_COFFEE, "walking, working or being watched isn't slacking")
+	w.slack(10.0, "slacking", false)
+	assert_almost_eq(w.slacked, Workday.MORNING_COFFEE + 10.0 * Workday.DAY_MINUTES / Workday.DAY_SECONDS, 0.01)
+	assert_eq(w.best_slack, w.slacked)
+
+
+func test_quota_met_once_and_counts_for_the_week() -> void:
+	var w := Workday.new(PATH)
+	var need := (w.quota() - w.slacked) * Workday.DAY_SECONDS / Workday.DAY_MINUTES
+	assert_false(w.slack(need - 1.0, "slacking", false))
+	assert_true(w.slack(2.0, "slacking", false), "true the moment the quota is met")
+	assert_false(w.slack(2.0, "slacking", false), "only once a day")
+	assert_true(w.quota_met())
+	assert_eq(w.quota_days, 1)
+	w.next_day()
+	assert_eq(w.slacked, Workday.MORNING_COFFEE, "a new day, a fresh meter")
+	assert_false(w.quota_met())
+	assert_gt(w.slacked_week, w.quota(), "the week keeps it")
+	w.floor_i = 3
+	assert_gt(w.quota(), Workday.QUOTA[0], "higher floors want more")
+
+
+func test_close_call_adds_slack() -> void:
+	var w := Workday.new(PATH)
+	w.close_call()
+	assert_eq(w.close_calls, 1)
+	assert_eq(w.slacked, Workday.MORNING_COFFEE + Workday.CLOSE_CALL)
+
+
+func test_next_visit_countdown_in_real_seconds() -> void:
+	var w := Workday.new(PATH)
+	var first := float(Workday.boss_for(1).at)
+	assert_almost_eq(w.next_visit_in(), first * Workday.DAY_SECONDS / Workday.DAY_MINUTES, 0.01)
+	w.minutes = Workday.DAY_MINUTES - 1.0
+	assert_eq(w.next_visit_in(), -1.0, "none left today")
+	assert_eq(Workday.hours_text(135.0), "2:15")
+
+
+func test_slack_saves_and_resets_with_the_week() -> void:
+	var w := Workday.new(PATH)
+	w.slack(30.0, "slacking", false)
+	w.close_call()
+	w.save()
+	var again := Workday.new(PATH)
+	assert_almost_eq(again.slacked, w.slacked, 0.01)
+	assert_eq(again.close_calls, 1)
+	assert_almost_eq(again.best_slack, w.best_slack, 0.01)
+	again.new_week(false)
+	assert_eq(again.slacked_week, Workday.MORNING_COFFEE)
+	assert_eq(again.quota_days, 0)
+	assert_almost_eq(again.best_slack, w.best_slack, 0.01, "the best day is forever")

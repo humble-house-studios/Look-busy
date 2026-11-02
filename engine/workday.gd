@@ -34,6 +34,15 @@ const LOOKOUT_LEAD := 8.0
 const COVERS_PER_DAY := 1
 const SNITCH_AT := [150.0, 330.0]
 const SNITCH := 15.0
+## The slack meter: game minutes spent playing a game while the boss can't see
+## you. Each floor sets a daily quota (game minutes). The day starts with a
+## coffee break already on it (a head start makes a goal feel reachable).
+const QUOTA := [120.0, 150.0, 180.0]
+const MORNING_COFFEE := 15.0
+## Alt-tab with the boss this close (or a call ringing) and you weren't
+## caught: a close call, worth slack minutes. Once per visit.
+const CLOSE_CALL := 10.0
+const CLOSE_RANGE := 4.0
 
 var week := 1
 var floor_i := 1
@@ -52,6 +61,14 @@ var cells_today := 0
 var covers_today := 0
 ## Every Friday so far: [{week, floor, title, score, avg, promoted}, ...].
 var shipped: Array = []
+## Slack (game minutes): today, this week, the best day ever. Close calls today.
+var slacked := MORNING_COFFEE
+var slacked_week := MORNING_COFFEE
+var best_slack := 0.0
+var close_calls := 0
+## Days this week the quota was met.
+var quota_days := 0
+var _quota_hit := false
 
 var _path: String
 var _grace := 0.0
@@ -159,6 +176,53 @@ func strike() -> String:
 	return level
 
 
+## Playing a game unseen fills the slack meter. True the moment today's
+## quota is met.
+func slack(delta: float, activity: String, seen: bool) -> bool:
+	if fired or minutes >= DAY_MINUTES or activity != "slacking" or seen:
+		return false
+	return _add_slack(delta * DAY_MINUTES / DAY_SECONDS)
+
+
+## A close call: slack minutes on top. True if that met the quota.
+func close_call() -> bool:
+	close_calls += 1
+	return _add_slack(CLOSE_CALL)
+
+
+func _add_slack(m: float) -> bool:
+	slacked += m
+	slacked_week += m
+	best_slack = maxf(best_slack, slacked)
+	if not _quota_hit and slacked >= quota():
+		_quota_hit = true
+		quota_days += 1
+		return true
+	return false
+
+
+func quota() -> float:
+	return QUOTA[clampi(floor_i, 1, QUOTA.size()) - 1]
+
+
+func quota_met() -> bool:
+	return slacked >= quota()
+
+
+## Real seconds until the boss's next visit (or -1: none left today).
+func next_visit_in() -> float:
+	var t := next_visit()
+	if t < 0.0:
+		return -1.0
+	return (t - minutes) * DAY_SECONDS / DAY_MINUTES
+
+
+## "1:05" for game minutes.
+static func hours_text(m: float) -> String:
+	var total := int(m)
+	return "%d:%02d" % [total / 60, total % 60]
+
+
 func in_grace() -> bool:
 	return _grace > 0.0
 
@@ -189,6 +253,8 @@ func new_week(promote: bool) -> void:
 		best_floor = maxi(best_floor, floor_i)
 	day = 0
 	strikes = 0
+	slacked_week = 0.0
+	quota_days = 0
 	_morning()
 	save()
 
@@ -201,6 +267,8 @@ func start_over() -> void:
 	day = 0
 	strikes = 0
 	fired = false
+	slacked_week = 0.0
+	quota_days = 0
 	_morning()
 	save()
 
@@ -227,6 +295,10 @@ func _morning() -> void:
 	suspicion = 0.0
 	cells_today = 0
 	_grace = 0.0
+	close_calls = 0
+	slacked = 0.0
+	_quota_hit = false
+	_add_slack(MORNING_COFFEE)
 
 
 func fill_cell() -> void:
@@ -330,6 +402,12 @@ func load_save() -> void:
 	cells = int(cfg.get_value("run", "cells", 0))
 	cells_today = int(cfg.get_value("run", "cells_today", 0))
 	covers_today = int(cfg.get_value("run", "covers_today", 0))
+	slacked = float(cfg.get_value("run", "slacked", MORNING_COFFEE))
+	slacked_week = float(cfg.get_value("run", "slacked_week", slacked))
+	best_slack = float(cfg.get_value("run", "best_slack", slacked))
+	close_calls = int(cfg.get_value("run", "close_calls", 0))
+	quota_days = int(cfg.get_value("run", "quota_days", 0))
+	_quota_hit = slacked >= quota()
 	var sh = cfg.get_value("run", "shipped", [])
 	shipped = sh if sh is Array else []
 
@@ -350,4 +428,9 @@ func save() -> void:
 	cfg.set_value("run", "cells_today", cells_today)
 	cfg.set_value("run", "covers_today", covers_today)
 	cfg.set_value("run", "shipped", shipped)
+	cfg.set_value("run", "slacked", slacked)
+	cfg.set_value("run", "slacked_week", slacked_week)
+	cfg.set_value("run", "best_slack", best_slack)
+	cfg.set_value("run", "close_calls", close_calls)
+	cfg.set_value("run", "quota_days", quota_days)
 	cfg.save(_path)

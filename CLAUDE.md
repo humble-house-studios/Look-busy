@@ -146,7 +146,14 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   the CEO walks silent) on a fixed schedule, a suspicion meter, strikes
   (warning, write-up, fired = run over). Seated, ALT-TAB (Tab / pad Y / the
   button) covers that screen with `scenes/office/spreadsheet.gd` (a
-  `Computer.cover`). Pop-ups: `scenes/office/busy_notice.gd`. Rules in
+  `Computer.cover`). Pop-ups: `scenes/office/busy_notice.gd`. Title screen:
+  `scenes/office/busy_title.gd` (once per launch: a looping cartoon of the
+  loop and three rules, nothing past floor 1 named). Slack meter: playing a
+  game unseen fills the day's quota (`Workday.QUOTA`, starts with a coffee
+  break); alt-tab with the boss within 4 m = a close call (bonus slack);
+  slack becomes research on Friday (`ShipDay.research`). The HUD counts down
+  to the boss's next visit; red screen edges show the side they're on.
+  Why: docs/look-busy.md, "Fun pass". Rules in
   `engine/workday.gd` (`user://look_busy.cfg`), tested in
   `tests/test_workday.gd`. Your own game: `engine/game_maker.gd` (pieces
   from desk wins / arcade machines / spreadsheet cells / collaborators, per

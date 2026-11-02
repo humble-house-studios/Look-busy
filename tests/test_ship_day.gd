@@ -58,3 +58,13 @@ func test_workday_remembers_what_shipped() -> void:
 	var again := Workday.new(path)
 	assert_eq(again.shipped.size(), 1)
 	assert_true(bool(again.shipped[0].promoted))
+
+
+func test_slacking_is_research() -> void:
+	assert_eq(ShipDay.research(150.0, 2), 2 * ShipDay.RESEARCH_PER_HOUR + 2 * ShipDay.RESEARCH_PER_QUOTA)
+	var plain := ShipDay.review({"genre": "PUZZLE"}, {}, 1, 1)
+	var studied := ShipDay.review({"genre": "PUZZLE"}, {}, 1, 1, 30)
+	assert_eq(studied.score, plain.score + 30)
+	assert_eq(studied.research, 30)
+	assert_gt(studied.press_avg, plain.press_avg)
+	assert_eq(ShipDay.review({}, {}, 1, 1, 30).score, 0, "research doesn't ship a game for you")
