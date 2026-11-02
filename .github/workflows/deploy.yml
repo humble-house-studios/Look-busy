@@ -114,7 +114,7 @@ jobs:
 
       # Every scripted line, recorded in the best voice per speaker: Dale in
       # Groq's Orpheus "troy" (Gemini stands in until Groq gets to a line), the
-      # arcade crew in Gemini, each their own voice. Only the daily run (and
+      # arcade crew in Cloudflare's Aura, each their own voice. Only the daily run (and
       # manual runs) record, to spare the free allowances for live replies;
       # pushes reuse what's done (cached per line).
       - uses: actions/cache@v4
@@ -132,8 +132,8 @@ jobs:
           RUN_EVENT: ${{ github.event_name }}
         run: |
           command -v ffmpeg >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
-          caps="0 0"
-          [ "$RUN_EVENT" = "schedule" ] || [ "$RUN_EVENT" = "workflow_dispatch" ] && caps="35 120"
+          caps="0 0 0"
+          [ "$RUN_EVENT" = "schedule" ] || [ "$RUN_EVENT" = "workflow_dispatch" ] && caps="35 120 150"
           python3 tools/record_best.py "${{ steps.deploy.outputs.url }}" $caps | tee best.log
           echo "::notice title=Office voice lines::$(tail -1 best.log)"
       - uses: actions/upload-artifact@v4

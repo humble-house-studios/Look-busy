@@ -132,7 +132,8 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   recorded through the voice server by `tools/record_best.py` (lines read by
   `tools/office_lines.py`) into `audio/dale/<md5[:12]>.mp3`, which `_say()`
   plays: Dale in Groq Orpheus "troy" (up to 35 a day; Gemini stands in until
-  then), the arcade crew in Gemini, one voice each. No Piper. Only the daily
+  then), the arcade crew in Cloudflare Aura, one speaker each (Gemini's free
+  voice only allows a handful a day). No Piper. Only the daily
   scheduled run and manual runs record; pushes reuse the cache. Add lines
   freely: the next daily run records them. Published at
   https://humble-house-studios.github.io/killin-in-comedy/office/ (second export

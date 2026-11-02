@@ -79,6 +79,22 @@ async function geminiSpeak(env, text, models, only = "") {
   return "";
 }
 
+// Cloudflare's Aura voices: the build records the arcade crew in them, one
+// speaker each (tools/record_best.py).
+async function auraSpeak(env, text, models, speaker) {
+  try {
+    const b64 = await audioToBase64(await env.AI.run("@cf/deepgram/aura-2-en", { text, speaker }));
+    if (b64 && b64.length > 200) {
+      models.speak = "@cf/deepgram/aura-2-en/" + speaker;
+      return b64;
+    }
+    models.speak_error_aura = "no audio";
+  } catch (e) {
+    models.speak_error_aura = String(e).slice(0, 160);
+  }
+  return "";
+}
+
 // Gemini sends raw 16-bit mono PCM; wrap it so the game can play it.
 function wavFromPcm16(pcm, rate) {
   const out = new Uint8Array(44 + pcm.length);
@@ -134,6 +150,7 @@ export default {
       const voice = typeof body.voice === "string" ? body.voice : "";
       const audio = body.engine === "groq" ? await groqSpeak(env, text, models, GROQ_VOICES.includes(voice) ? voice : "")
         : body.engine === "gemini" ? await geminiSpeak(env, text, models, /^[A-Z][a-z]+$/.test(voice) ? voice : "")
+        : body.engine === "aura" ? await auraSpeak(env, text, models, /^[a-z]+$/.test(voice) ? voice : "zeus")
         : await speak(env, text, models);
       return json({ audio, models });
     }
