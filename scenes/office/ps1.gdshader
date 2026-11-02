@@ -23,9 +23,9 @@ uniform vec3 room_col[6];
 uniform float room_range = 0.0;
 uniform vec3 room_ambient = vec3(-1.0);
 uniform vec3 room_fog = vec3(-1.0);
-// After hours (0 = golden hour, 1 = night): set for the whole office by
-// look_busy.gd when 5 PM rings mid-game (project.godot [shader_globals]).
-global uniform float after_hours;
+// After hours (0 = golden hour, 1 = night): office.gd _apply_night() sets it
+// on every office material when 5 PM rings mid-game (look_busy.gd).
+uniform float after_hours = 0.0;
 
 varying vec4 aff;
 varying vec3 light;

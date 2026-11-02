@@ -34,10 +34,3 @@ pointing/emulate_touch_from_mouse=true
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 environment/defaults/default_clear_color=Color(0.07, 0.06, 0.09, 1)
-
-[shader_globals]
-
-after_hours={
-"type": "float",
-"value": 0.0
-}

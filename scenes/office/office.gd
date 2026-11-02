@@ -298,13 +298,15 @@ var _camera: Camera3D
 var _screen_camera: Camera3D
 var _clock_hands: Array[Node3D] = []
 ## After hours (look_busy.gd: 5 PM rang mid-game): 0 = golden hour, 1 = night.
-## Fades over NIGHT_FADE seconds; drives ps1.gdshader's after_hours global and
-## the glow of the ceiling panels, the window and the sunbeam ([mat, day, night]).
+## Fades over NIGHT_FADE seconds; sets ps1.gdshader's after_hours on every
+## material _mat() made (_all_mats) and the glow of the ceiling panels, the
+## window and the sunbeam ([mat, day, night]).
 const NIGHT_FADE := 3.0
 var _night := 0.0
 var _night_on := false
 var _night_glow: Array = []
-## Push the lighting once at start (the global outlives a NEW GAME reload).
+var _all_mats: Array[ShaderMaterial] = []
+## Push the lighting once things are built.
 var _night_dirty := true
 var _hud: Control
 var _hint: Label
@@ -662,6 +664,9 @@ func _build_views() -> void:
 func _mat(albedo: Color, pattern := 0, albedo2 := Color.BLACK, texel := 24.0, emission := Color.BLACK) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = _ps1
+	_all_mats.append(m)
+	if _night > 0.0:
+		m.set_shader_parameter("after_hours", _night * _night * (3.0 - 2.0 * _night))
 	m.set_shader_parameter("albedo", albedo)
 	m.set_shader_parameter("albedo2", albedo2)
 	m.set_shader_parameter("pattern", pattern)
@@ -834,7 +839,8 @@ func _tick_night(delta: float) -> void:
 
 func _apply_night() -> void:
 	var e := _night * _night * (3.0 - 2.0 * _night)
-	RenderingServer.global_shader_parameter_set("after_hours", e)
+	for m in _all_mats:
+		m.set_shader_parameter("after_hours", e)
 	for g in _night_glow:
 		g[0].set_shader_parameter("emission", (g[1] as Color).lerp(g[2], e))
 

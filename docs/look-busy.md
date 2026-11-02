@@ -238,6 +238,6 @@ Machine lighting the room) and the clock runs on to 7 PM.
 
 Later: after hours as a relic or bonus mode (e.g. a relic that skips the
 tiredness, or a night-only desk). Rules: `Workday.start_overtime()` /
-`end_overtime()`, tested in `tests/test_workday.gd`. Lights: the
-`after_hours` shader global (`project.godot` [shader_globals]), faded by
-`office.gd` `set_after_hours()`.
+`end_overtime()`, tested in `tests/test_workday.gd`. Lights:
+`ps1.gdshader`'s `after_hours`, faded on every office material by `office.gd`
+`set_after_hours()`.

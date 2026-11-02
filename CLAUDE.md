@@ -156,8 +156,8 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   break); alt-tab with the boss within 4 m = a close call (bonus slack);
   slack becomes research on Friday (`ShipDay.research`). **After hours:** 5 PM
   ringing while seated at a game = you stay (`Workday.start_overtime()`): no
-  boss, slack x2 till 7 PM, the office goes dark (`after_hours` shader global in
-  `project.godot` [shader_globals], faded by office.gd `set_after_hours()`),
+  boss, slack x2 till 7 PM, the office goes dark (`ps1.gdshader` `after_hours`, faded on every office
+  material by office.gd `set_after_hours()`),
   and tomorrow starts tired (suspicion from minutes stayed). Dev: AFTER HOURS
   NOW. Why: docs/look-busy.md, "After hours". The HUD counts down
   to the boss's next visit; red screen edges show the side they're on.
