@@ -150,7 +150,7 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   (warning, write-up, fired = run over). Seated, ALT-TAB (Tab / pad Y / the
   button) covers that screen with `scenes/office/spreadsheet.gd` (a
   `Computer.cover`). Pop-ups: `scenes/office/busy_notice.gd`. Title screen:
-  `scenes/office/busy_title.gd` (once per launch: a looping cartoon of the
+  `scenes/office/busy_title.gd` (once per launch: a looping cartoon filmed live in the 3D office (stand-in you + Marge) of the
   loop and three rules, nothing past floor 1 named). Slack meter: playing a
   game unseen fills the day's quota (`Workday.QUOTA`, starts with a coffee
   break); alt-tab with the boss within 4 m = a close call (bonus slack);
