@@ -179,6 +179,11 @@ func _refresh() -> void:
 		rec.append("BEST DAY: %s SLACKED" % Workday.hours_text(wd.best_slack))
 	if wd.best_floor > 1:
 		rec.append("BEST FLOOR: %d" % wd.best_floor)
+	if office and office._ladder:
+		var st: LadderState = office._ladder.state
+		var tot := DeskGoals.total(DaleStory.read_stats(), st.best, Array(st.beaten))
+		if tot.x > 0:
+			rec.append("DESK STARS: %d/%d ★" % [tot.x, tot.y])
 	if wd.runs > 1:
 		rec.append("FIRED %d TIME%s" % [wd.runs - 1, "" if wd.runs == 2 else "S"])
 	_records.text = "  ".join(rec)

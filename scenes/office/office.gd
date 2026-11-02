@@ -166,7 +166,7 @@ const SETTINGS := {
 const WIPE := [
 	"user://dale.cfg", "user://ladder.cfg", "user://coworkers.cfg", "user://office_relics.cfg",
 	"user://tips.cfg", "user://save.cfg", "user://cube_desk.cfg", "user://notebook.json",
-	"user://look_busy.cfg",
+	"user://look_busy.cfg", "user://desk_goals.cfg",
 ]
 
 
@@ -248,14 +248,20 @@ class Computer:
 			send_button(last_uv(), false)
 
 	## Camera transform that frames the whole screen, centred.
-	func seat_transform(camera: Camera3D, view_size: Vector2, fov: float, fill: float) -> Transform3D:
+	## top / bottom: fractions of the view kept clear for the HUD (buttons,
+	## the goal card); the screen is framed in what's left.
+	func seat_transform(camera: Camera3D, view_size: Vector2, fov: float, fill: float, top := 0.0, bottom := 0.0) -> Transform3D:
 		var aspect := view_size.x / maxf(view_size.y, 1.0)
 		var half := tan(deg_to_rad(fov) * 0.5)
 		var tan_w := half if camera.keep_aspect == Camera3D.KEEP_WIDTH else half * aspect
 		var tan_h := half if camera.keep_aspect == Camera3D.KEEP_HEIGHT else half / aspect
-		var d := maxf(size.x * 0.5 / fill / tan_w, size.y * 0.5 / fill / tan_h)
+		var avail := clampf(1.0 - top - bottom, 0.3, 1.0)
+		var d := maxf(size.x * 0.5 / fill / tan_w, size.y * 0.5 / fill / (tan_h * avail))
 		var xf := screen.global_transform
-		return Transform3D(xf.basis.orthonormalized(), xf.origin + xf.basis.z.normalized() * d)
+		var b := xf.basis.orthonormalized()
+		# Raise the camera so the screen sits in the middle of the clear part.
+		var lift := (top - bottom) * tan_h * d
+		return Transform3D(b, xf.origin + b.z * d + b.y * lift)
 
 var _ps1 := preload("res://scenes/office/ps1.gdshader")
 var _monitor_shader := preload("res://scenes/office/monitor.gdshader")
@@ -388,6 +394,9 @@ var _touch_last := false
 var _dale_news := false
 ## Look Busy (scenes/office/look_busy.gd): the workday, the boss, alt-tab.
 var _busy: Node
+## Every desk's three stars, its next goal and the celebrations
+## (scenes/office/desk_card.gd).
+var _desk_card: Control
 var _talking := false
 ## The conversation in progress: {id, title, steps}, and where we are in it.
 var _talk := {}
@@ -438,6 +447,7 @@ func _ready() -> void:
 	_busy.setup(self)
 	_busy.build()
 	_busy.set_enabled(bool(setting("look_busy")))
+	_build_desk_card()
 	_build_marker()
 	_build_talk_box()
 	_dale_story = DaleStory.new()
@@ -2268,6 +2278,51 @@ func _build_hud() -> void:
 	t.tween_property(_title, "modulate:a", 0.0, 1.5)
 
 
+## The desk goal card and star plaques (built after the desks and machines).
+func _build_desk_card() -> void:
+	_desk_card = preload("res://scenes/office/desk_card.gd").new()
+	_hud.add_child(_desk_card)
+	_desk_card.setup(self)
+	for pc in _computers:
+		var id := ""
+		if pc.view == _game_vp:
+			id = "comedy"
+		elif pc == _pong_pc:
+			id = "pong"
+		elif _proof_view and pc.view == _proof_view:
+			id = "proof"
+		elif _cube_vp and pc.view == _cube_vp:
+			id = "cube"
+		elif _loot_vp and pc.view == _loot_vp:
+			id = "loot"
+		if id != "":
+			_desk_card.add_desk(id, pc)
+	for id in _ladder._machines:
+		_desk_card.add_desk(id, _ladder._machines[id].pc)
+
+
+## Seated: the share of the view (top, bottom) that buttons, the Look Busy
+## HUD and the goal card cover, so the screen is framed clear of them.
+func _seat_reserve() -> Vector2:
+	var h := _hud.size.y
+	if h <= 0.0:
+		return Vector2.ZERO
+	var top := 0.0
+	var bottom := 0.0
+	var tops: Array = [_busy._alt_button if _busy else null, _busy._hud if _busy and _busy.enabled else null]
+	# STAND UP sits clear of the games' own buttons when it's at the bottom.
+	if _stand_corner == Control.PRESET_TOP_LEFT:
+		tops.append(_stand_button)
+	for c in tops:
+		if c and c.visible:
+			top = maxf(top, c.position.y + c.size.y + 8.0)
+	if _desk_card:
+		var r: Vector2 = _desk_card.reserve()
+		top = maxf(top, r.x)
+		bottom = maxf(bottom, r.y)
+	return Vector2(top / h, bottom / h)
+
+
 func _hud_button(text: String, corner: Control.LayoutPreset) -> Button:
 	var b := Button.new()
 	b.text = text
@@ -2528,7 +2583,8 @@ func _process(delta: float) -> void:
 	var walk_fov := lerpf(70.0, 52.0, _zoom * _zoom * (3.0 - 2.0 * _zoom))
 	# Glide between the walking view and the seated view.
 	_glide = minf(1.0, _glide + delta / _glide_time)
-	var target := _seat.seat_transform(_camera, Vector2(_world_vp.size), SEAT_FOV, SEAT_FILL) if _seat else _head.global_transform
+	var room := _seat_reserve() if _seat else Vector2.ZERO
+	var target := _seat.seat_transform(_camera, Vector2(_world_vp.size), SEAT_FOV, SEAT_FILL, room.x, room.y) if _seat else _head.global_transform
 	var target_fov := SEAT_FOV if _seat else walk_fov
 	if _talking:
 		target = _talk_view()

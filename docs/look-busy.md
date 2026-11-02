@@ -199,3 +199,26 @@ spreadsheet.
 
 **Next playtest:** do players alt-tab in time on their first Marge visit, do
 they laugh at the strike stamp, and do they press GO HOME for a second day?
+
+## Desk pass (2026-11-02): every desk has a goal
+
+A playthrough of every desk (5 office desks, 3 arcade machines) found two
+problems they all shared:
+
+- **No one says what "beating" a desk means.** Each game has its own win
+  (a Pong boss on every 4th stage, a Proof Hand target, the claw's top-shelf
+  star), but you only learn it by reading each game's rules or asking Dale.
+- **The office's buttons covered the games.** Seated upright, STAND UP sat on
+  each game's top-left: on Proof Hand that hid the target score, the one
+  number you need.
+
+**What changed:**
+
+| Change | Why it works |
+|---|---|
+| **Three stars per desk** (`engine/desk_goals.gd`): one easy, one real, one master goal, such as clear a stage, beat a boss, then beat 3 bosses. | Three-star ratings (Angry Birds, Cut the Rope) give a first win in minutes, then a reason to replay. An easy first star is early success, the strongest predictor of sticking with a game (competence, in self-determination theory). |
+| **Seated, a card shows the ONE next goal**, with progress ("WIN 3 SETS (2/3)"). | One clear goal, visible while you play, is the flow condition. Progress shown as a count uses the goal-gradient effect: people speed up near a goal. |
+| **A gold star plaque over every other desk.** | Empty stars across the room are unfinished business: people remember and return to unfinished tasks (the Zeigarnik effect). Collecting a full set is a classic completion hook. The plaque hides at your own desk so it doesn't block the screen. |
+| **Earning a star: a banner, a fanfare, and "OFFICE TOTAL n/24".** The total is also on the title screen. | A short, loud reward at the moment of success makes the win feel earned. A running total gives each desk a reason to be beaten. |
+| **The seated camera frames the screen clear of the buttons, the HUD and the card.** | Nothing a game shows is hidden. |
+| **Comedy's opening rules: 5 lines of small text became 3 big steps.** | On a desk monitor the old text was unreadable; the in-game coach teaches the rest live. |

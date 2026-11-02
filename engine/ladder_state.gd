@@ -46,6 +46,8 @@ var paid := false
 var items: Array[String] = []
 ## Machines whose big prize you've won: claw, pusher, ragdoll.
 var beaten: Array[String] = []
+## The most tickets one win paid, per machine (engine/desk_goals.gd stars).
+var best := {}
 ## Machine rounds played (a closed-off coworker opens up after one more).
 var plays := 0
 ## Milestones: entered, market, reveal, pitch, memo, archive, stage.
@@ -98,8 +100,10 @@ func petty_cash() -> int:
 	return PETTY_CASH
 
 
-func win_tickets(n: int) -> void:
+func win_tickets(n: int, machine := "") -> void:
 	tickets += maxi(0, n)
+	if machine != "" and n > int(best.get(machine, 0)):
+		best[machine] = n
 	save()
 
 
@@ -233,6 +237,8 @@ func load_save() -> void:
 	items.clear()
 	for s in cfg.get_value("ladder", "items", []):
 		items.append(str(s))
+	var b = cfg.get_value("ladder", "best", {})
+	best = b if b is Dictionary else {}
 	beaten.clear()
 	for s in cfg.get_value("ladder", "beaten", []):
 		beaten.append(str(s))
@@ -250,5 +256,6 @@ func save() -> void:
 	cfg.set_value("ladder", "market_cash", market_cash)
 	cfg.set_value("ladder", "items", Array(items))
 	cfg.set_value("ladder", "beaten", Array(beaten))
+	cfg.set_value("ladder", "best", best)
 	cfg.set_value("ladder", "done", Array(done))
 	cfg.save(_path)

@@ -432,14 +432,18 @@ func _show_title() -> void:
 	_overlay_box.add_child(sign)
 	_flicker(sign)
 	_overlay_box.add_child(_neon("COMEDY", 64, COLOR_NEON_BLUE))
-	var how := _label("It's live! Mic time refills every second, so keep firing jokes.\n" +
-		"Cards build a bit. LAND IT to cash in: laughs × the Room × chains.\n" +
-		"Setup > Punchline > Tag chains multiply. Tags re-fire the punchline.\n" +
-		"Watch the Room line: land at a peak, before a heckle cuts your bit.\n" +
-		"Hit the target before the light!", 23)
-	how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	how.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_overlay_box.add_child(how)
+	# Three steps, big enough to read on a desk monitor; the coach teaches the rest live.
+	for step in [["1", "TAP CARDS to build a bit", COLOR_PUNCHLINE],
+			["2", "LAND IT when the Room line peaks", COLOR_NEON_BLUE],
+			["3", "Hit the laugh target before the light", COLOR_NEON]]:
+		var how := _label("%s  %s" % [step[0], step[1]], 36, step[2].lerp(Color.WHITE, 0.35))
+		how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		how.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_overlay_box.add_child(how)
+	var chain := _label("Setup > Punchline > Tag: chains multiply ×1.5", 26, Color(1, 1, 1, 0.7))
+	chain.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	chain.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_overlay_box.add_child(chain)
 	var start := _button("Start your set", COLOR_PUNCHLINE)
 	start.pressed.connect(_new_run)
 	start.pressed.connect(_sound.start_music)

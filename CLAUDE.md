@@ -168,6 +168,16 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   `tools/busy_walk.gd` (PASS/FAIL) and
   `tools/busy_shot.gd` (screenshots). Scripts that drive the office turn it
   off first (`office._busy.set_enabled(false)`).
+- **Desk stars** (`engine/desk_goals.gd`, `scenes/office/desk_card.gd`, on
+  with or without Look Busy): every desk game and arcade machine has three
+  stars, each a plain goal read from the shared stats or the ladder
+  (`LadderState.best` = biggest single win per machine, `beaten`). Seated, a
+  card shows the desk, its stars and the next goal (under the screen upright,
+  top left sideways); a gold plaque floats over every other desk; a new star
+  plays a banner and a fanfare once (`user://desk_goals.cfg`). The seated
+  camera frames the screen clear of the buttons, the HUD and the card
+  (`_seat_reserve()`), so no game's score hides under STAND UP.
+  Tests: `tests/test_desk_goals.gd`.
 - **The ladder** (`scenes/office/ladder.gd`): past the office door, built into
   the same 3D world (same walking, sitting, talking): the arcade (claw, coin
   pusher, Fall Guy ragdoll, prize counter, five coworkers), the basement

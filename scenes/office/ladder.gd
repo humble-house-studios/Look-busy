@@ -965,7 +965,7 @@ func spend_token() -> bool:
 
 
 func win_tickets(n: int, machine: String, beats: bool) -> void:
-	state.win_tickets(n)
+	state.win_tickets(n, machine)
 	if beats and state.beat(machine):
 		var names := {"claw": "CLAW KING", "pusher": "PUSH YOUR LUCK", "ragdoll": "FALL GUY"}
 		var msg := "MACHINE BEATEN: %s (%d/3)" % [names.get(machine, machine), state.beaten.size()]
