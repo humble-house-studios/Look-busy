@@ -2,7 +2,8 @@ extends Node
 ## The meta office: walk up to a desk in a PS1-style office and play real
 ## games on the computers, first person.
 ## - The 3D world renders at a third of the screen size (chunky PS1 pixels),
-##   lit like a sunny morning: cream walls, daylight through the blinds.
+##   lit at golden hour: a low orange sun through the blinds, dimmed ceiling
+##   panels, warm shadows (ps1.gdshader holds the lights).
 ## - Each computer is a chunky beige 90s CRT (4:3); the game runs in a window
 ##   on its desktop (teal wallpaper, title bar, taskbar). Each game runs in
 ##   its own viewport; a second full-res pass draws only the game screens, so
@@ -808,7 +809,8 @@ func _putty() -> ShaderMaterial:
 
 func _build_room() -> void:
 	# Room: x -3.5..3.5, z -3..4, 2.6 tall. You start by the door at +z.
-	# Sunny and friendly: cream walls, soft sage carpet, warm wood trim.
+	# Golden hour: cream walls, soft sage carpet, warm wood trim, lit mostly by
+	# the low sun through the window (lights in ps1.gdshader).
 	var wall := _mat(Color(0.88, 0.82, 0.68), 6, Color.BLACK, 20.0)
 	var carpet := _mat(Color(0.5, 0.6, 0.56), 1, Color(0.43, 0.52, 0.49), 28.0)
 	var ceiling := _mat(Color(0.93, 0.92, 0.87), 2, Color(0.64, 0.62, 0.58), 30.0)
@@ -826,18 +828,18 @@ func _build_room() -> void:
 			[Vector3(0.02, 0.1, 7.0), Vector3(-3.49, 0.05, 0.5)], [Vector3(0.02, 0.1, 7.0), Vector3(3.49, 0.05, 0.5)]]:
 		_box(b[0], b[1], trim)
 
-	# Ceiling panels, warm white.
-	var panel := _mat(Color(0.2, 0.2, 0.2), 0, Color.BLACK, 24.0, Color(1.0, 0.98, 0.88))
+	# Ceiling panels, dimmed: the sun does the lighting.
+	var panel := _mat(Color(0.2, 0.2, 0.2), 0, Color.BLACK, 24.0, Color(0.62, 0.55, 0.45))
 	_box(Vector3(0.6, 0.03, 1.2), Vector3(0, 2.59, -1.6), panel)
 	_box(Vector3(0.6, 0.03, 1.2), Vector3(0, 2.59, 2.2), panel)
 
-	# Window on the left wall: bright sky through half-open blinds, and the
-	# patch of sunshine it throws across the carpet.
-	_box(Vector3(0.04, 1.1, 1.8), Vector3(-3.49, 1.5, -0.5), _mat(Color(0.5, 0.48, 0.42), 4, Color(0.1, 0.1, 0.1), 24.0, Color(0.72, 0.86, 1.0)))
+	# Window on the left wall: an orange evening sky through half-open blinds,
+	# and the long low sunbeam it throws across the carpet.
+	_box(Vector3(0.04, 1.1, 1.8), Vector3(-3.49, 1.5, -0.5), _mat(Color(0.5, 0.48, 0.42), 4, Color(0.1, 0.1, 0.1), 24.0, Color(1.0, 0.68, 0.36)))
 	_box(Vector3(0.08, 1.2, 0.06), Vector3(-3.47, 1.5, 0.43), trim)
 	_box(Vector3(0.08, 1.2, 0.06), Vector3(-3.47, 1.5, -1.43), trim)
 	_box(Vector3(0.12, 0.05, 1.9), Vector3(-3.45, 0.93, -0.5), trim)
-	_box(Vector3(1.6, 0.004, 1.7), Vector3(-2.55, 0.003, -0.45), _mat(Color(0.58, 0.66, 0.56), 1, Color(0.5, 0.58, 0.5), 28.0, Color(0.16, 0.12, 0.05)), false, Vector3(0, 0.12, 0))
+	_box(Vector3(4.2, 0.004, 1.3), Vector3(-1.3, 0.003, -0.35), _mat(Color(0.58, 0.66, 0.56), 1, Color(0.5, 0.58, 0.5), 28.0, Color(0.42, 0.2, 0.04)), false, Vector3(0, 0.18, 0))
 
 	_build_desk()
 	_build_pong_desk()
