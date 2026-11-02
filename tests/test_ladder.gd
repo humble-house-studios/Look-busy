@@ -45,10 +45,16 @@ func test_doors_open_in_order() -> void:
 	var l := LadderState.new(LADDER)
 	assert_false(l.door_open("office", false))
 	assert_true(l.door_open("office", true))
-	for pair in [["boardroom", "market"], ["corner", "pitch"], ["stage", "memo"]]:
+	for pair in [["boardroom", "market"], ["corner", "pitch"]]:
 		assert_false(l.door_open(pair[0], true))
 		l.mark(pair[1])
 		assert_true(l.door_open(pair[0], true))
+	l.mark("memo")
+	assert_false(l.door_open("top", true, true), "the top floor stays locked (not built yet)")
+	assert_false(l.door_open("stage", true, true), "the bookcase: archive first")
+	l.mark("archive")
+	assert_false(l.door_open("stage", true, false), "and Ray's secret")
+	assert_true(l.door_open("stage", true, true))
 
 
 func test_tickets_cash_out_as_the_portfolio_once() -> void:
@@ -101,12 +107,11 @@ func test_objective_walks_the_rooms() -> void:
 	assert_string_contains(l.objective(0), "(0/300)")
 	l.items.append("door_key")
 	assert_string_contains(l.objective(0), "TRADING")
-	for m in ["market", "pitch", "memo", "stage"]:
+	l.mark("market")
+	assert_string_contains(l.objective(0), "DALE")
+	for m in ["reveal", "pitch", "memo"]:
 		l.mark(m)
-	assert_string_contains(l.objective(2), "2/5")
-	l.mark("archive")
-	assert_string_contains(l.objective(5), "THE END")
-	assert_true(l.true_ending(5))
+	assert_string_contains(l.objective(0), "TOP FLOOR")
 
 
 # ---------------------------------------------------------------- coworkers

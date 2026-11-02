@@ -103,45 +103,29 @@ func test_the_ladder_rooms_in_order() -> void:
 	ladder.items.append(LadderState.DOOR_KEY)
 	assert_eq(_goal(), "trading")
 	ladder.mark("market")
+	assert_eq(_goal(), "dale_board", "Dale is waiting in the boardroom")
+	ladder.mark("reveal")
 	assert_eq(_goal(), "pitch")
 	ladder.mark("pitch")
 	assert_eq(_goal(), "memo")
 	ladder.mark("memo")
-	assert_eq(_goal(), "stage")
+	assert_eq(_goal(), "door_top", "the end of the road for now: the locked top floor")
+	assert_eq(_point("corner"), "door_top")
+	assert_eq(_point("boardroom"), "door_corner")
 
 
-func test_after_the_stage_the_archive_needs_rays_key() -> void:
+func test_the_hidden_stage_and_archive_are_never_pointed_at() -> void:
 	_finish_story()
 	ladder.collect_paycheck({})
 	ladder.items.append(LadderState.DOOR_KEY)
-	for m in ["market", "pitch", "memo", "stage"]:
+	for m in ["market", "reveal", "pitch", "memo"]:
 		ladder.mark(m)
-	assert_eq(_goal(), "cabinet", "Ray's not out until two machines are beaten")
-	ladder.beat("claw")
-	ladder.beat("pusher")
-	assert_eq(_goal(), "ray", "Ray's out and has news")
 	ladder.items.append("archive_key")
-	assert_eq(_goal(), "door_archive")
 	ladder.mark("archive")
-	_meet_everyone()
-	assert_eq(_goal(), "", "all talked out, short on secrets: nothing to point at")
-	crew.seen_at["kev"] = -1
-	crew.trust["kev"] = 1
-	assert_eq(_goal(), "kev", "a coworker with more to say")
-
-
-func test_true_ending_points_at_dale_in_the_crowd_then_nothing() -> void:
-	_finish_story()
-	ladder.collect_paycheck({})
-	for m in ["market", "pitch", "memo", "stage", "archive"]:
-		ladder.mark(m)
-	ladder.items.append(LadderState.DOOR_KEY)
-	_meet_everyone()
-	for i in LadderState.SECRETS_TOTAL:
-		crew.secrets.append("s%d" % i)
-	assert_eq(_goal(), "dale_stage")
-	ladder.mark("true_end")
-	assert_eq(_goal(), "")
+	crew.secrets.append("ray")
+	assert_eq(_goal(), "door_top")
+	assert_true(GoalTarget.open_doors(story, ladder, crew).door_stage, "the bookcase opens for diggers")
+	assert_false(GoalTarget.open_doors(story, ladder, crew).door_top)
 
 
 # ---------------------------------------------------------------- routing
@@ -163,7 +147,7 @@ func test_in_another_room_points_at_the_next_door() -> void:
 	_finish_story()
 	ladder.collect_paycheck({})
 	ladder.items.append(LadderState.DOOR_KEY)
-	for m in ["market", "pitch"]:
+	for m in ["market", "reveal", "pitch"]:
 		ladder.mark(m)
 	assert_eq(_point("office"), "door_office")
 	assert_eq(_point("arcade"), "door_trading")
@@ -195,12 +179,13 @@ func test_locked_trading_door_from_the_office_routes_to_the_arcade_first() -> vo
 func test_unlockers() -> void:
 	assert_eq(GoalTarget.unlock("door_boardroom", story, {}, ladder, crew), "trading")
 	assert_eq(GoalTarget.unlock("door_corner", story, {}, ladder, crew), "pitch")
-	assert_eq(GoalTarget.unlock("door_stage", story, {}, ladder, crew), "memo")
+	assert_eq(GoalTarget.unlock("door_stage", story, {}, ladder, crew), "", "a secret")
+	assert_eq(GoalTarget.unlock("door_top", story, {}, ladder, crew), "", "no key yet")
 	assert_eq(GoalTarget.unlock("door_trading", story, {}, ladder, crew), "cabinet")
 	assert_eq(GoalTarget.unlock("door_office", story, {}, ladder, crew), "dale")
 
 
 func test_every_key_has_a_room() -> void:
 	for key in ["dale", "pong", "cube", "comedy", "proof", "loot", "door_office", "claw", "pusher",
-			"ragdoll", "counter", "trading", "pitch", "memo", "stage", "dale_stage", "door_archive", "ray"]:
+			"ragdoll", "counter", "trading", "dale_board", "pitch", "memo", "door_top", "stage", "door_archive", "ray"]:
 		assert_ne(GoalTarget.room_of(key), "", key)

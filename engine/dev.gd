@@ -75,8 +75,26 @@ static func beat_machines(state: LadderState) -> void:
 static func open_ladder(state: LadderState) -> void:
 	for item in [LadderState.DOOR_KEY, "archive_key"]:
 		state.apply_reward("item:" + item)
-	for m in ["market", "pitch", "memo"]:
+	for m in ["market", "reveal", "pitch", "memo"]:
 		state.mark(m)
+
+
+## Dale's reveal in the boardroom, as if you'd talked it through.
+static func reveal(state: LadderState) -> void:
+	state.mark("market")
+	state.mark("reveal")
+
+
+## The hidden stage: the basement found and Ray's secret (the comedy club).
+static func open_club(crew: Coworkers, state: LadderState) -> void:
+	state.apply_reward("item:archive_key")
+	state.mark("archive")
+	if not crew.secrets.has("ray"):
+		crew.secrets.append("ray")
+	crew.trust["ray"] = maxi(crew.tier("ray"), 2)
+	if not crew.met.has("ray"):
+		crew.met.append("ray")
+	crew.save()
 
 
 static func wipe() -> void:

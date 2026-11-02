@@ -96,6 +96,8 @@ func setup(o: Node) -> void:
 		["BEAT ALL\nMACHINES", _machines],
 		["MAX ALL\nCOWORKERS", _coworkers],
 		["OPEN ALL DOORS", _doors],
+		["DALE'S REVEAL\n(BOARDROOM)", _reveal],
+		["OPEN THE\nHIDDEN STAGE", _club],
 	])
 	_section(list, "LOOT MACHINE", [
 		["+10 COMP TOKENS", _loot_tokens],
@@ -412,6 +414,18 @@ func _doors() -> void:
 	Dev.open_ladder(office._ladder.state)
 	office._ladder.dev_refresh()
 	_say("EVERY DOOR IS OPEN. TELEPORT OR WALK ON THROUGH.")
+
+
+func _reveal() -> void:
+	Dev.reveal(office._ladder.state)
+	office._ladder.dev_refresh()
+	_say("DALE HAS TOLD YOU: HE'S THE FOUNDER. NEXT: THE PITCH.")
+
+
+func _club() -> void:
+	Dev.open_club(office._ladder.crew, office._ladder.state)
+	office._ladder.dev_refresh()
+	_say("BASEMENT FOUND + RAY'S SECRET: THE CORNER OFFICE BOOKCASE IS OPEN.")
 
 
 # ---------------------------------------------------------------- Loot Machine

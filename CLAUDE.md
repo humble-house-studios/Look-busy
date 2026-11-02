@@ -164,7 +164,10 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
 - **The ladder** (`scenes/office/ladder.gd`): past the office door, built into
   the same 3D world (same walking, sitting, talking): the arcade (claw, coin
   pusher, Fall Guy ragdoll, prize counter, five coworkers), the basement
-  archive, the trading floor, the boardroom, the corner office and the stage.
+  archive, the trading floor, the boardroom (Dale reveals he's the founder),
+  the corner office (his memo; the locked TOP FLOOR door = the final room, not
+  built yet) and, hidden behind a bookcase, the old comedy club stage (opens
+  after the archive + Ray's secret; no finale).
   Every screen is a machine in `scenes/ladder/` (extends `machine.gd`, 720×1280,
   its own SubViewport, Buttons only so the pad cursor works) added with
   `_add_computer()`; `hub` is the ladder node. Rules in `engine/ladder_state.gd`

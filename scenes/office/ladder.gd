@@ -9,9 +9,14 @@ extends Node
 ##     basement ARCHIVE off the west wall.
 ##   TRADING FLOOR (z 12-20): your tickets cash out as a portfolio; double it.
 ##   BOARDROOM (z 20-26): pitch the board, three yeses of five.
-##   CORNER OFFICE (z 26-32): the founder's memo on the desk, a 3D mini-golf toy.
-##   THE STAGE (z 32-40): an open mic. Land your set. With every secret and
-##     the archive found, Dale is in the crowd for the true ending.
+##   BOARDROOM: Dale is waiting at the end of the table. He's the founder
+##     (the reveal, partway up). Then pitch the board, three yeses of five.
+##   CORNER OFFICE (z 26-32): Dale's memo on the desk, a 3D mini-golf toy, and
+##     the TOP FLOOR door in the west wall: the final room, locked (not built).
+##   THE STAGE (z 32-40): a hidden extra. The building was a comedy club, The
+##     Brick Wall; a bookcase in the corner office hides the way in and only
+##     moves once you've found the basement and Ray told you about the club.
+##     An empty, dusty club; one more set if you like. No finale.
 ## Each screen is a machine scene (scenes/ladder/) in its own SubViewport,
 ## added with the office's _add_computer(). Rooms out of reach are hidden and
 ## their machines paused. Rules: engine/ladder_state.gd, engine/coworkers.gd.
@@ -47,8 +52,6 @@ var _check := 0.0
 var _ticker: Label3D
 var _ticker_x := 0.0
 var _memo_node: Node3D
-var _stage_dale: Node3D
-var _crowd := {}
 var _talk_id := ""
 var _time := 0.0
 var _locked_hint := ""
@@ -713,6 +716,8 @@ func _build_boardroom() -> void:
 	# A water jug, the sad bagels and a framed motto.
 	_cyl(0.07, 0.24, Vector3(-0.6, 0.92, z0 + 1.7), _mat(r, Color(0.6, 0.75, 0.9), 0, Color.BLACK, 24.0, Color(0.05, 0.08, 0.12)), p)
 	_label("SYNERGY", Vector3(3.48, 1.7, z0 + 3.0), 18, Color(0.9, 0.85, 0.7), p, Vector3(0, -PI / 2, 0))
+	# Dale, waiting for you: fifteen years and he finally came up the ladder.
+	_person(r, "dale_board", Vector3(1.3, 0, z0 + 1.9), -PI * 0.81, LOOKS.dale)
 	_door("corner", "boardroom", Vector3(2.5, 0, z1 + 0.05), true, Color(0.5, 0.35, 0.2), "CORNER OFFICE")
 
 
@@ -724,7 +729,7 @@ func _build_corner() -> void:
 	var wall := _mat(r, Color(0.8, 0.74, 0.62), 6, Color.BLACK, 20.0)
 	var carpet := _mat(r, Color(0.55, 0.45, 0.32), 1, Color(0.5, 0.4, 0.28), 26.0)
 	var ceil := _mat(r, Color(0.9, 0.88, 0.82), 2, Color(0.6, 0.58, 0.52), 30.0)
-	_shell(r, z0, z1, 3.0, wall, carpet, ceil, 2.5, 2.5)
+	_shell(r, z0, z1, 3.0, wall, carpet, ceil, 2.5, 2.5, z0 + 4.4)
 	# A wall of window: the city at sunset.
 	_box(Vector3(0.04, 2.0, 5.0), Vector3(3.48, 1.5, z0 + 3.0), _glow(r, Color(1.0, 0.6, 0.35)), false, Vector3.ZERO, p)
 	for i in 6:
@@ -764,7 +769,30 @@ func _build_corner() -> void:
 	_box(Vector3(0.02, 0.4, 0.3), Vector3(-2.89, 1.15, z0 + 1.2), _glow(r, Color(1.0, 0.6, 0.75)), false, Vector3.ZERO, p)
 	_label("SMOOTHIES", Vector3(-2.88, 1.62, z0 + 1.2), 12, Color(1.0, 0.95, 0.9), p, Vector3(0, PI / 2, 0))
 	_label("YOU MADE IT.", Vector3(0, 2.5, z0 + 0.08), 22, Color(0.5, 0.3, 0.15), p)
-	_door("stage", "corner", Vector3(2.5, 0, z1 + 0.05), true, Color(0.2, 0.2, 0.22), "EXIT -> STREET")
+	# The final room: up a floor, through a door nobody has a key to. Yet.
+	_door("top", "corner", Vector3(-3.55, 0, z0 + 4.4), false, Color(0.75, 0.62, 0.3), "TOP FLOOR")
+	_label("^ STAIRS ^", Vector3(-3.48, 2.55, z0 + 4.4), 10, Color(0.6, 0.45, 0.25), p, Vector3(0, PI / 2, 0))
+	# The way to the old club stage: a door hidden behind a bookcase.
+	_door("stage", "corner", Vector3(2.5, 0, z1 + 0.05), true, Color(0.3, 0.18, 0.1), "")
+	_bookcase(_doors.stage)
+
+
+## Dress a door as a bookcase (on the side you'd see first): it swings with
+## the door, and the LOCKED signs hide so it just looks like shelves.
+func _bookcase(d: Dictionary) -> void:
+	var hinge: Node3D = d.hinge
+	var wood := _mat("corner", Color(0.32, 0.2, 0.11), 3, Color(0.27, 0.16, 0.09), 40.0)
+	_box(Vector3(DOOR_W + 0.1, DOOR_H + 0.05, 0.28), Vector3(DOOR_W * 0.5, DOOR_H * 0.5, -0.17), wood, false, Vector3.ZERO, hinge)
+	var cols := [Color(0.6, 0.15, 0.12), Color(0.15, 0.3, 0.5), Color(0.75, 0.6, 0.2), Color(0.2, 0.4, 0.2), Color(0.5, 0.3, 0.5)]
+	for shelf in 4:
+		var y := 0.35 + shelf * 0.48
+		_box(Vector3(DOOR_W, 0.03, 0.26), Vector3(DOOR_W * 0.5, y - 0.02, -0.33), wood, false, Vector3.ZERO, hinge)
+		for b in 8:
+			var h := 0.24 + fmod(b * 0.37 + shelf * 0.21, 0.14)
+			_box(Vector3(0.09, h, 0.2), Vector3(0.1 + b * 0.115, y + h * 0.5, -0.34), _mat("corner", cols[(b + shelf) % cols.size()]), false, Vector3.ZERO, hinge)
+	for l in d.locks:
+		l.visible = false
+	d["secret"] = true
 
 
 func _build_stage() -> void:
@@ -778,7 +806,11 @@ func _build_stage() -> void:
 	_shell(r, z0, z1, 3.2, brick, floor_mat, ceil, -99.0, 2.5)
 	_label("THE BRICK WALL", Vector3(0, 2.6, z1 - 0.08), 34, Color(1.0, 0.3, 0.55), p, Vector3(0, PI, 0))
 	_label("COMEDY CLUB  EST. 1987", Vector3(0, 2.35, z1 - 0.08), 14, Color(1.0, 0.8, 0.4), p, Vector3(0, PI, 0))
-	_label("OPEN MIC TONIGHT", Vector3(-3.48, 2.0, z0 + 2.0), 16, Color(0.4, 0.9, 1.0), p, Vector3(0, PI / 2, 0))
+	_label("CLOSED SINCE 2011", Vector3(-3.48, 2.0, z0 + 2.0), 16, Color(0.4, 0.9, 1.0), p, Vector3(0, PI / 2, 0))
+	# Dale's old poster, still up.
+	_box(Vector3(0.02, 0.9, 0.62), Vector3(3.47, 1.55, z0 + 2.6), _mat(r, Color(0.9, 0.82, 0.6)), false, Vector3.ZERO, p)
+	_label("BIG DEAL", Vector3(3.45, 1.8, z0 + 2.6), 20, Color(0.7, 0.12, 0.2), p, Vector3(0, -PI / 2, 0))
+	_label("ONE WEEK ONLY\n2009", Vector3(3.45, 1.4, z0 + 2.6), 10, Color(0.2, 0.15, 0.1), p, Vector3(0, -PI / 2, 0))
 	# The stage: a low platform with a ramp up the middle, the mic and a stool.
 	var stage_mat := _mat(r, Color(0.2, 0.12, 0.08), 3, Color(0.16, 0.1, 0.06), 30.0)
 	var sz0 := z1 - 2.6
@@ -798,9 +830,8 @@ func _build_stage() -> void:
 	p.add_child(rig)
 	_cyl(0.02, 0.6, Vector3(0, 0.3, -0.05), metal, rig)
 	_monitor(r, rig, Vector3(0, 0.6, 0.0), Vector2(0.3, 0.53), "stage", "res://scenes/ladder/final_set.gd", Color(0.1, 0.1, 0.12))
-	_label("YOUR SET", Vector3(0, 1.32, -0.06), 12, Color(1.0, 0.4, 0.7), rig)
-	# Crowd tables with candles, and the regulars (coworkers you befriended
-	# show up here).
+	_label("ONE MORE SET?", Vector3(0, 1.32, -0.06), 12, Color(1.0, 0.4, 0.7), rig)
+	# Empty tables, dusty candles. Nobody's here. That's the point.
 	var table := _mat(r, Color(0.15, 0.1, 0.08))
 	var candle := _glow(r, Color(1.0, 0.7, 0.3))
 	var seats := [Vector3(-2.2, 0, z0 + 1.6), Vector3(0.0, 0, z0 + 1.2), Vector3(2.2, 0, z0 + 1.6), Vector3(-1.2, 0, z0 + 3.4), Vector3(1.2, 0, z0 + 3.4)]
@@ -808,11 +839,6 @@ func _build_stage() -> void:
 		_cyl(0.35, 0.04, t + Vector3(0, 0.72, 0), table, p)
 		_cyl(0.04, 0.7, t + Vector3(0, 0.35, 0), table, p)
 		_cyl(0.03, 0.06, t + Vector3(0, 0.77, 0), candle, p)
-	var ids := CoworkerLines.ORDER
-	for i in ids.size():
-		var t: Vector3 = seats[i]
-		_crowd[ids[i]] = _person(r, "crowd_" + ids[i], t + Vector3(0.0, 0, -0.55), 0.0, LOOKS[ids[i]], true)
-	_stage_dale = _person(r, "dale_stage", Vector3(-0.55, 0, z0 + 1.2), 0.25, LOOKS.dale, true)
 
 
 # ---------------------------------------------------------------- talking
@@ -849,14 +875,16 @@ func talk(id: String) -> Dictionary:
 	match id:
 		"memo":
 			return {"id": id, "title": "MEMO  -  FROM: B.D. (FOUNDER)", "steps": MEMO.duplicate(true)}
-		"dale_stage":
-			return {"id": id, "title": "DALE", "steps": DALE_STAGE.duplicate(true)}
+		"dale_board":
+			if state.is_done("reveal"):
+				return {"id": id, "title": "DALE  -  FOUNDER (QA)", "steps": [{"line": DALE_AFTER[randi() % DALE_AFTER.size()]}]}
+			return {"id": id, "title": "DALE  -  ...FOUNDER?", "steps": DALE_REVEAL.duplicate(true)}
 	return crew.talk(id, _ctx())
 
 
 ## A reply was picked. Returns what's said back, line by line.
 func choose(id: String, choice: Dictionary) -> Array:
-	if id == "dale_stage" or not CoworkerLines.PEOPLE.has(id):
+	if not CoworkerLines.PEOPLE.has(id):
 		return [choice.get("reply", "")]
 	var out := crew.choose(id, choice, _ctx())
 	for r in out.rewards:
@@ -884,10 +912,11 @@ func end_talk(id: String, finished := true) -> void:
 		"memo":
 			if finished and not state.is_done("memo"):
 				state.mark("memo")
-				_toast("THE STAGE DOOR IS OPEN")
-		"dale_stage":
-			if finished:
-				state.mark("true_end")
+				_toast("THE TOP FLOOR: WEST WALL, UP THE STAIRS.\nLOCKED. NOT YET.")
+		"dale_board":
+			if finished and not state.is_done("reveal"):
+				state.mark("reveal")
+				_toast("DALE IS THE FOUNDER.\nNOW WIN THE PITCH.")
 	_update_doors(false)
 	_refresh_people()
 
@@ -897,25 +926,33 @@ func _ctx() -> Dictionary:
 		"busy": office._busy != null and office._busy.enabled}
 
 
+## Dale's note on the corner-office desk (read after he's told you the truth).
 const MEMO := [
-	{"line": "To whoever finally opens this office: hi. It's been empty since 2011. Sorry about the dust."},
-	{"line": "I did stand-up for one week. Called myself Big Deal. Then I bought the club. The Brick Wall."},
-	{"line": "I turned it into a game studio. Hired good people. Built a ladder with this office on top."},
-	{"line": "Then the top got scary. So I took the desk by the window and called myself QA."},
-	{"line": "Fifteen years. I never climbed it. You did, in about a week."},
-	{"line": "This office was never the point. The stage is. Out the door, down the street. Go. - Dale"},
+	{"line": "Memo. From: B.D. To: whoever got this far. (It's you. I watched from the boardroom.)"},
+	{"line": "This office was the top of my ladder. I sat in that chair once. It doesn't squeak. Disappointing."},
+	{"line": "But there's one more floor. I built it last, the night before I chickened out. Then I locked it."},
+	{"line": "Up there was the thing I really wanted to make. A game for people. Not for a corner office."},
+	{"line": "The door's in the west wall. I don't have the key anymore. I'll find it. Promise. - Dale"},
 ]
 
-const DALE_STAGE := [
-	{"line": "You read the memo. ...Yeah. It was me. Big Deal. Founder. Fifteen years in QA."},
-	{"line": "Built a whole ladder and got scared of the top. You climbed it like it was nothing."},
-	{"line": "Then you walked right past the corner office to get to this mic. Good. That's the job."},
+## Dale in the boardroom: the reveal, partway up the ladder.
+const DALE_REVEAL := [
+	{"line": "Hey. Don't freak out. It's me. Dale. From the window. First time past that door in fifteen years."},
+	{"line": "The board's waiting on their founder to show. That's... also me. B.D. Big Deal."},
+	{"line": "I bought an old comedy club, made it a studio, built this whole ladder. Then the top got scary."},
+	{"line": "So I hid in QA. Fifteen years. I sent you up because you finish things. I never could."},
 	{"choices": [
-		{"text": "I learned it from you.", "reply": "From me? I quit everything after a week. ...Except this place. Huh.", "kind": "line"},
-		{"text": "Your turn, Big Deal.", "reply": "My turn? ...One minute. Hold my purple pen.", "kind": "line"},
-		{"text": "Same sandwich daily?", "reply": "Turkey on rye. Fifteen years. I'm loyal. To a fault. To a sandwich.", "kind": "line"},
+		{"text": "You're the CEO?!", "reply": "Nobody's met the CEO because he eats turkey on rye by the window. Hi.", "kind": "line"},
+		{"text": "Why hide in QA?", "reply": "Up top, what you make gets judged. In QA, you do the judging. Way safer.", "kind": "line"},
+		{"text": "Proud of you, Dale.", "reply": "Oh no. Don't. I'll cry on the bagels. ...Thanks, kid.", "kind": "line"},
 	]},
-	{"line": "THE END. Thanks for playing. Come back to the office anytime. I'll be at the window."},
+	{"line": "Go win the pitch. They don't know I'm me. I'll be at the back. Where I'm comfortable."},
+]
+
+const DALE_AFTER := [
+	"They still think I'm here to refill the water jug.",
+	"Win the pitch. Three yeses. I'd vote, but that'd be weird.",
+	"Fifteen years. The chairs up here are so much nicer.",
 ]
 
 
@@ -962,10 +999,8 @@ func pitch_won() -> void:
 func stage_won() -> void:
 	var first := not state.is_done("stage")
 	state.mark("stage")
-	if state.true_ending(crew.secrets.size()):
-		_toast("SOMEONE IN THE CROWD IS WAVING AT YOU...")
-	elif first:
-		_toast("YOU KILLED. THE END... FOR NOW.\nFIND EVERY SECRET FOR THE TRUE ENDING.")
+	if first:
+		_toast("THE EMPTY CLUB LAUGHS BACK.\nJUST LIKE 2009, PROBABLY.")
 	_refresh_people()
 
 
@@ -1110,7 +1145,9 @@ func _lock_text(id: String) -> String:
 		"corner":
 			return "LOCKED. WIN THE PITCH FIRST."
 		"stage":
-			return "LOCKED. READ THE MEMO\nON THE DESK."
+			return "A BOOKCASE. DUSTY.\nSOMETHING'S DRAFTY BEHIND IT."
+		"top":
+			return "TOP FLOOR. LOCKED.\nNOBODY HAS THE KEY. YET."
 	return "LOCKED"
 
 
@@ -1143,7 +1180,7 @@ func _entered(room: String) -> void:
 		"corner":
 			_toast("THE CORNER OFFICE.\nNOBODY'S BEEN HERE IN YEARS.")
 		"stage":
-			_toast("THE BRICK WALL. OPEN MIC.\nGET ON STAGE. YOUR SET'S ON THE MONITOR.")
+			_toast("THE BRICK WALL. CLOSED SINCE 2011.\nTHIS WAS A COMEDY CLUB. BIG DEAL PLAYED HERE.")
 
 
 ## Show the room you're in and its neighbours (seen through open doors);
@@ -1181,7 +1218,7 @@ func _update_doors(instant: bool) -> void:
 	var office_done: bool = office._dale_story.next_chapter().is_empty()
 	for id in _doors:
 		var d: Dictionary = _doors[id]
-		var want := state.door_open(id, office_done)
+		var want := state.door_open(id, office_done, crew.secrets.has("ray"))
 		if want and not d.open:
 			d.open = true
 			if id == "office":
@@ -1205,6 +1242,8 @@ func _update_doors(instant: bool) -> void:
 func _toast_door(id: String) -> void:
 	if id == "archive":
 		_toast("THE BASEMENT DOOR IS UNLOCKED (BY THE CLAW)")
+	elif id == "stage":
+		_toast("...THE BOOKCASE IN THE CORNER OFFICE CREAKED OPEN.")
 
 
 func _refresh_people() -> void:
@@ -1215,11 +1254,8 @@ func _refresh_people() -> void:
 			p.alert.visible = p.root.visible and crew.has_news(id, _ctx()) and _talk_id != id and goal_id != id
 	if _people.has("memo"):
 		_people.memo.alert.visible = not state.is_done("memo") and _talk_id != "memo" and goal_id != "memo"
-	for id in _crowd:
-		_crowd[id].visible = crew.tier(id) >= 2
-	if _stage_dale:
-		_stage_dale.visible = state.is_done("stage") and state.true_ending(crew.secrets.size())
-		_people.dale_stage.alert.visible = _stage_dale.visible and not state.is_done("true_end") and _talk_id != "dale_stage" and goal_id != "dale_stage"
+	if _people.has("dale_board"):
+		_people.dale_board.alert.visible = not state.is_done("reveal") and _talk_id != "dale_board" and goal_id != "dale_board"
 
 
 func _tick_people(delta: float, me: Vector3) -> void:

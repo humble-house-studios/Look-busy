@@ -120,11 +120,14 @@ func next_talk(stats: Dictionary) -> Dictionary:
 
 ## The system prompt for the voice chat: who Dale is, what he's told you so
 ## far, the secrets he's still keeping, and what you should do next.
-func persona(stats: Dictionary) -> String:
+## revealed: you told them you're the founder (in the boardroom, up the
+## ladder); until then it's your biggest secret.
+func persona(stats: Dictionary, revealed := false) -> String:
 	var told: Array[String] = []
 	var secret: Array[String] = []
 	for ch in DaleLines.CHAPTERS:
 		(told if done.has(ch.id) else secret).append("- " + ch.fact)
+	(told if revealed else secret).append("- " + DaleLines.FOUNDER)
 	var lines: Array[String] = [DaleLines.PERSONA]
 	if not told.is_empty():
 		lines.append("What you have already told the new hire (you can talk about it):\n" + "\n".join(told))

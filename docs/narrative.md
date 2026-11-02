@@ -61,9 +61,9 @@ paycheck → tokens → tickets → portfolio → board votes → material.
 | Arcade (the break room) | Claw King, Push Your Luck (coin pusher), Fall Guy (fling the Dale dummy), prize counter | Buy the DOOR KEY (300 tickets) |
 | Archive (basement, secret) | Shelved games with notes about the founder | Ray's key opens it; finding it counts for the true ending |
 | Trading floor | Five stocks from your world on a 90s ticker; RUMORS come before NEWS | Double your cashed-out tickets by day 8 |
-| Boardroom | Answer each board member's objection with a matching card (YES, AND is wild) | 3 yeses of 5 |
-| Corner office | The founder's memo; a putting toy; the fabled smoothie machine | Read the memo |
-| The stage (The Brick Wall) | Five bits, 100 laughs; secrets become killer bits | Land the set |
+| Boardroom | Dale is waiting: he's the founder (the reveal). Then answer each board member's objection with a matching card (YES, AND is wild) | Hear Dale out, then 3 yeses of 5 |
+| Corner office | Dale's memo; a putting toy; the fabled smoothie machine; the TOP FLOOR door (locked: the final room, not built yet) | Read the memo |
+| The stage (The Brick Wall), hidden | Behind a bookcase in the corner office; opens once you've found the archive and Ray told you the building was a club. An empty club and one more set, for fun | An extra, no finale |
 
 Rules: `engine/ladder_state.gd` (currencies, doors, to-do), `engine/arcade_rules.gd`,
 `engine/market.gd`, `engine/pitch.gd`, `engine/final_set.gd`. Screens:
@@ -100,13 +100,20 @@ the boss off twice a day). Any warm reply, gift or callback makes up.
 | Theo | Knife Fight Kitchen | COOKING (genre), THEO |
 | Ray | Mop Drop | MOP BEATS (sound), RAY |
 
-### The mystery
-Dale is the founder. He did stand-up for one week as "Big Deal", bought the
-comedy club (The Brick Wall), turned it into the studio in 2011, built a
-ladder with a corner office on top, got scared of the top and took the QA
-desk by the window. The memo says so and sends you out to the open mic.
-With all five secrets and the archive found, Dale is in the crowd for the
-true ending.
+### The mystery (docs/look-busy.md)
+Dale is the founder. He did stand-up for one week as "Big Deal" (2009), bought
+the comedy club (The Brick Wall), turned it into the studio in 2011, built a
+ladder up to a corner office and a top floor, got scared of the top and took
+the QA desk by the window. **He tells you himself, partway up**: he's waiting
+in the boardroom once you've doubled your money on the trading floor
+(`dale_board`, `LadderState` milestone `reveal`; the voice chat keeps it secret
+until then via `DaleLines.FOUNDER`). His memo in the corner office points at
+the last door: the TOP FLOOR, locked. That's the final room (make your own
+game, then go outside), not built yet.
+
+The comedy club is a hidden extra for players who dig: find the basement and
+learn Ray's secret, and the corner-office bookcase swings open onto the old
+stage, dusty, with Dale's BIG DEAL poster still up. No open mic finale.
 
 ## Writing rules
 - Lines under ~110 characters; reply buttons under 28. Three replies per talk.

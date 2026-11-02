@@ -8,8 +8,10 @@ extends RefCounted
 ##
 ## Keys: dale, pong, cube, comedy, proof, loot (office desks); door_office,
 ## door_trading, door_boardroom, door_corner, door_stage, door_archive;
-## claw, pusher, ragdoll (arcade cabinets), counter, trading, pitch, memo,
-## stage, dale_stage and the coworkers (gloria, kev, bernie, theo, ray).
+## claw, pusher, ragdoll (arcade cabinets), counter, trading, dale_board
+## (Dale, revealed in the boardroom), pitch, memo, door_top (the locked final
+## room), stage and the coworkers (gloria, kev, bernie, theo, ray). The
+## archive and the hidden stage are extras: never pointed at.
 ## "cabinet" (from goal()) means "the nearest unbeaten arcade cabinet".
 
 ## Which office desk earns each stat Dale's chapters ask for.
@@ -33,9 +35,9 @@ const ROOM := {
 	"door_trading": "arcade", "door_archive": "arcade", "cabinet": "arcade",
 	"gloria": "arcade", "kev": "arcade", "bernie": "arcade", "theo": "arcade", "ray": "arcade",
 	"trading": "trading", "door_boardroom": "trading",
-	"pitch": "boardroom", "door_corner": "boardroom",
-	"memo": "corner", "door_stage": "corner",
-	"stage": "stage", "dale_stage": "stage",
+	"dale_board": "boardroom", "pitch": "boardroom", "door_corner": "boardroom",
+	"memo": "corner", "door_stage": "corner", "door_top": "corner",
+	"stage": "stage",
 }
 
 
@@ -60,23 +62,14 @@ static func goal(story: DaleStory, stats: Dictionary, ladder: LadderState, crew:
 		return unlock("door_trading", story, stats, ladder, crew)
 	if not ladder.is_done("market"):
 		return "trading"
+	if not ladder.is_done("reveal"):
+		return "dale_board"
 	if not ladder.is_done("pitch"):
 		return "pitch"
 	if not ladder.is_done("memo"):
 		return "memo"
-	if not ladder.is_done("stage"):
-		return "stage"
-	if not ladder.is_done("archive"):
-		return "door_archive" if ladder.has("archive_key") else unlock("door_archive", story, stats, ladder, crew)
-	var secrets := crew.secrets.size()
-	if ladder.true_ending(secrets):
-		return "" if ladder.is_done("true_end") else "dale_stage"
-	# Still short on secrets: whoever has something new to say.
-	var ctx := context(ladder)
-	for id in CoworkerLines.ORDER:
-		if Coworkers.present(id, ladder.beaten.size()) and crew.has_news(id, ctx):
-			return id
-	return ""
+	# The end of the road for now: the locked door to the final room.
+	return "door_top"
 
 
 ## What opens a locked door: the key ("" if it's open, or nothing does).
@@ -97,17 +90,19 @@ static func unlock(door: String, story: DaleStory, stats: Dictionary, ladder: La
 			return "trading"
 		"door_corner":
 			return "pitch"
-		"door_stage":
-			return "memo"
+		"door_stage", "door_top":
+			# The bookcase is a secret; the top floor has no key yet.
+			return ""
 	return ""
 
 
 ## The ladder's doors, open or not, as {key: bool}.
-static func open_doors(story: DaleStory, ladder: LadderState) -> Dictionary:
+static func open_doors(story: DaleStory, ladder: LadderState, crew: Coworkers = null) -> Dictionary:
 	var office_done := story.next_chapter().is_empty()
+	var club := crew != null and crew.secrets.has("ray")
 	var out := {}
-	for door in ["office", "trading", "archive", "boardroom", "corner", "stage"]:
-		out["door_" + door] = ladder.door_open(door, office_done)
+	for door in ["office", "trading", "archive", "boardroom", "corner", "stage", "top"]:
+		out["door_" + door] = ladder.door_open(door, office_done, club)
 	return out
 
 
@@ -129,7 +124,7 @@ static func hop(key: String, here: String) -> String:
 ## What to walk to right now: goal, routed from `here`, past locked doors.
 ## dist: {cabinet key: metres} so "cabinet" becomes the nearest unbeaten one.
 static func point(story: DaleStory, stats: Dictionary, ladder: LadderState, crew: Coworkers, here: String, dist := {}) -> String:
-	var open := open_doors(story, ladder)
+	var open := open_doors(story, ladder, crew)
 	var unlocks := {}
 	for door in open:
 		if not open[door]:

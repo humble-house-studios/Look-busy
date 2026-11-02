@@ -2,11 +2,14 @@ class_name LadderState
 extends RefCounted
 ## Progress past the office door, up the ladder: the arcade (tokens in,
 ## tickets out, the prize counter sells the Door Key), the trading floor
-## (tickets cash out as your portfolio; double it), the boardroom (win the
-## pitch), the corner office (read the founder's memo) and the stage (land
-## your set), plus the secret archive in the arcade basement. Each room pays
-## out what the next one spends. Pure rules; saved in user://ladder.cfg.
-## Design: docs/narrative.md (The Ladder).
+## (tickets cash out as your portfolio; double it), the boardroom (Dale is
+## waiting there: he's the founder; then win the pitch), the corner office
+## (his memo) and the locked TOP FLOOR door (the final room; not built yet).
+## Hidden extras for players who dig: the archive in the arcade basement, and
+## behind a bookcase in the corner office the old comedy club stage (opens
+## once you've found the archive and Ray told you the building was a club).
+## Each room pays out what the next one spends. Pure rules; saved in
+## user://ladder.cfg. Design: docs/narrative.md (The Ladder).
 
 const SAVE_PATH := "user://ladder.cfg"
 
@@ -45,7 +48,7 @@ var items: Array[String] = []
 var beaten: Array[String] = []
 ## Machine rounds played (a closed-off coworker opens up after one more).
 var plays := 0
-## Milestones: entered, market, pitch, memo, stage, archive.
+## Milestones: entered, market, reveal, pitch, memo, archive, stage.
 var done: Array[String] = []
 var market_cash := 0
 
@@ -179,8 +182,10 @@ func market_target() -> int:
 
 
 ## Which doors are open. office_done: Dale's story is finished (he sends you
-## through the office door).
-func door_open(door: String, office_done: bool) -> bool:
+## through the office door). club_known: Ray told you the building was a
+## comedy club (with the archive found, the bookcase opens onto the stage).
+## The top floor stays locked: the final room isn't built yet.
+func door_open(door: String, office_done: bool, club_known := false) -> bool:
 	match door:
 		"office":
 			return office_done
@@ -193,13 +198,10 @@ func door_open(door: String, office_done: bool) -> bool:
 		"corner":
 			return is_done("pitch")
 		"stage":
-			return is_done("memo")
+			return is_done("archive") and club_known
+		"top":
+			return false
 	return false
-
-
-## The true ending: every coworker's secret, and the archive found.
-func true_ending(secret_count: int) -> bool:
-	return secret_count >= SECRETS_TOTAL and is_done("archive")
 
 
 ## The on-screen to-do once Dale's story is done.
@@ -210,15 +212,13 @@ func objective(secret_count: int) -> String:
 		return "WIN %d TICKETS, BUY THE DOOR KEY (%d/%d)" % [DOOR_KEY_COST, mini(tickets, DOOR_KEY_COST), DOOR_KEY_COST]
 	if not is_done("market"):
 		return "TRADING FLOOR: DOUBLE YOUR MONEY"
+	if not is_done("reveal"):
+		return "BOARDROOM: ...IS THAT DALE?"
 	if not is_done("pitch"):
 		return "BOARDROOM: WIN THE PITCH (3 OF 5 VOTES)"
 	if not is_done("memo"):
 		return "CORNER OFFICE: CHECK THE DESK"
-	if not is_done("stage"):
-		return "THE STAGE: LAND YOUR SET"
-	if not true_ending(secret_count):
-		return "SECRETS FOUND: %d/%d%s" % [secret_count, SECRETS_TOTAL, "" if is_done("archive") else " + THE BASEMENT"]
-	return "THE END. THANKS FOR PLAYING."
+	return "THE TOP FLOOR: LOCKED. NOT YET."
 
 
 func load_save() -> void:

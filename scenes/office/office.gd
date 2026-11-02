@@ -1645,7 +1645,7 @@ func _hold_talk() -> void:
 func _release_talk() -> void:
 	if not _voice_chat.listening():
 		return
-	_voice_chat.stop_listening(_dale_story.persona(_talk_stats))
+	_voice_chat.stop_listening(_dale_story.persona(_talk_stats, _ladder.state.is_done("reveal")))
 	if _voice_chat.busy:
 		_talk_name.text = "DALE  -  THINKING..."
 		_hold_button.text = "..."

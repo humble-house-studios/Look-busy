@@ -54,8 +54,10 @@ func test_max_coworkers_pays_every_tier_once() -> void:
 func test_open_ladder_unlocks_every_door() -> void:
 	var state := LadderState.new(LADDER)
 	Dev.open_ladder(state)
-	for door in ["office", "trading", "archive", "boardroom", "corner", "stage"]:
+	for door in ["office", "trading", "archive", "boardroom", "corner"]:
 		assert_true(state.door_open(door, true), door)
+	assert_true(state.is_done("reveal"), "Dale's reveal counts as done")
+	assert_false(state.door_open("top", true, true), "the top floor stays locked")
 	assert_false(state.door_open("office", false), "the office door is still Dale's")
 	Dev.beat_machines(state)
 	assert_eq(state.beaten.size(), 3)
@@ -82,3 +84,10 @@ func test_dev_boost_fills_mic_heat_and_clock() -> void:
 	assert_eq(b.crowd_energy, float(Balance.MAX_CROWD_ENERGY))
 	assert_eq(b.time_left, before + 30.0)
 	assert_eq(b.set_length, before + 30.0, "the clock bar stays in range")
+
+
+func test_open_club_opens_the_hidden_stage() -> void:
+	var state := LadderState.new(LADDER)
+	var crew := Coworkers.new(CREW, 1)
+	Dev.open_club(crew, state)
+	assert_true(state.door_open("stage", true, crew.secrets.has("ray")))

@@ -1,7 +1,8 @@
 extends SceneTree
 ## Debug walkthrough of the ladder, headless or under xvfb. Starts fresh
 ## saves with Dale's story done, then:
-##  - walks (real physics) from the office through every door to the stage,
+##  - walks (real physics) from the office through every door (Dale's reveal
+##    in the boardroom, the locked top floor, the bookcase to the hidden stage),
 ##    unlocking each door the way the game does;
 ##  - checks that every screen can be tapped from in front of it and that
 ##    every coworker can be tapped to talk;
@@ -106,6 +107,10 @@ func _init() -> void:
 	await frames(80)
 	await walk(Vector3(0, 0, 18.8), 21.2)
 	check(ladder.room() == "boardroom", "walked into the boardroom")
+	check(ladder.objective().contains("DALE"), "to-do: is that Dale?")
+	await tap_person("dale_board")
+	await talk_through("dale_board", "")
+	check(ladder.state.is_done("reveal"), "Dale told you: he's the founder")
 	await tap_screen("pitch")
 	ladder.pitch_won()
 	await frames(80)
@@ -114,8 +119,18 @@ func _init() -> void:
 	await tap_screen("putt")
 	await tap_person("memo")
 	await talk_through("memo", "")
-	check(ladder.state.is_done("memo"), "memo read opens the stage")
+	check(ladder.state.is_done("memo"), "memo read")
+	check(ladder.objective().contains("TOP FLOOR"), "to-do: the top floor (%s)" % ladder.objective())
 	await frames(80)
+	# The top floor door: locked (the final room isn't built yet).
+	await walk(Vector3(-2.0, 0, 30.8), -4.2, 2.0, Vector2(-1, 0))
+	check(ladder.room() == "corner" and office._player.global_position.x > -3.6, "the top floor door is locked")
+	check(ladder.hint().contains("TOP FLOOR"), "it says so")
+	# The bookcase opens once you've found the basement and Ray told you about
+	# the club (both happened earlier in this walk).
+	check(ladder._doors.stage.open == (ladder.state.is_done("archive") and ladder.crew.secrets.has("ray")), "the bookcase opens for diggers only")
+	Dev.open_club(ladder.crew, ladder.state)
+	await frames(70)
 	await walk(Vector3(2.5, 0, 30.8), 33.4)
 	check(ladder.room() == "stage", "walked onto the stage floor")
 	# Up the ramp and onto the stage.
@@ -123,7 +138,7 @@ func _init() -> void:
 	check(office._player.global_position.y > 0.15, "climbed the ramp onto the stage (y %.2f)" % office._player.global_position.y)
 	await tap_screen("stage")
 	ladder.stage_won()
-	check(ladder.objective().contains("SECRETS"), "after the set: find the rest (%s)" % ladder.objective())
+	check(ladder.objective().contains("TOP FLOOR"), "the hidden set is an extra, no finale (%s)" % ladder.objective())
 	print("\n%s: %d failure(s)" % ["ALL GOOD" if fails == 0 else "PROBLEMS", fails])
 	quit()
 
