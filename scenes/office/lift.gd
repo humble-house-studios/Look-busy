@@ -274,7 +274,7 @@ func tick(delta: float, me: Vector3) -> bool:
 				_want[at] = true
 				phase = "idle"
 				_update_lamps()
-			elif _open[at] <= 0.0 and _t >= DOOR_TIME:
+			elif (_open[at] <= 0.001 and _t >= DOOR_TIME) or _t >= DOOR_TIME * 3.0:
 				var a: String = rooms[at]
 				var b: String = rooms[-at]
 				_ride_len = 0.9 + 0.55 * absi(LEVEL[b] - LEVEL[a])
@@ -327,11 +327,15 @@ func _slide(delta: float) -> void:
 		if rooms[s] == "":
 			continue
 		var target := 1.0 if _want[s] else 0.0
-		if is_equal_approx(_open[s], target):
+		if _open[s] == target:
 			continue
 		if (_open[s] == 0.0 or _open[s] == 1.0) and _door_sfx and is_inside_tree():
 			_door_sfx.play()
 		_open[s] = move_toward(_open[s], target, delta / DOOR_TIME)
+		# Land exactly on shut / open: a sliver left over would hold a ride
+		# (or a call) forever.
+		if absf(_open[s] - target) < 0.001:
+			_open[s] = target
 		var e := ease(_open[s], -1.8)
 		var i := 0
 		for p in _panels[s]:
