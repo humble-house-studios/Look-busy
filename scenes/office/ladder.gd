@@ -95,9 +95,16 @@ func setup(o: Node) -> void:
 
 # ---------------------------------------------------------------- materials
 
-## The office's PS1 material, lit by this room's lights.
+var _mat_cache := {}
+
+## The office's PS1 material, lit by this room's lights. Identical ones are
+## shared (nothing changes a ladder material after it's made).
 func _mat(room: String, albedo: Color, pattern := 0, albedo2 := Color.BLACK, texel := 24.0, emission := Color.BLACK) -> ShaderMaterial:
+	var key := [room, albedo, pattern, albedo2, texel, emission]
+	if _mat_cache.has(key):
+		return _mat_cache[key]
 	var m: ShaderMaterial = office._mat(albedo, pattern, albedo2, texel, emission)
+	_mat_cache[key] = m
 	var L: Dictionary = _light(room)
 	m.set_shader_parameter("office_lights", 0.0 if room != "office" else 1.0)
 	m.set_shader_parameter("room_pos", L.pos)
