@@ -43,6 +43,7 @@ extends Node
 ## Rules: engine/workday.gd. The pop-ups: scenes/office/busy_notice.gd.
 
 const Notice := preload("res://scenes/office/busy_notice.gd")
+const DiskPopup := preload("res://scenes/office/disk_popup.gd")
 const DOOR := Vector3(1.8, 0.0, 4.05)
 const SPAWN := Vector3(0.3, 0.0, 3.2)
 const EYE := 1.6
@@ -60,8 +61,12 @@ const BELL := preload("res://audio/bell.wav")
 var office: Node
 var wd: Workday
 var gm: GameMaker
+## Every piece ever found, kept across weeks and runs (engine/disk_binder.gd).
+var binder: DiskBinder
 var enabled := false
 var notice: Control
+## The full-screen NEW DISK! / COMBO FOUND! pop-up (scenes/office/disk_popup.gd).
+var disks: Control
 
 var _sheet_vp: SubViewport
 var _sheet: Control
@@ -110,6 +115,10 @@ func setup(o: Node) -> void:
 	office = o
 	wd = Workday.new()
 	gm = GameMaker.new()
+	binder = DiskBinder.new()
+	# Pieces from before the binder existed count as found (no pop-ups).
+	for p in gm.pieces:
+		binder.record(p.name)
 	_sheet_vp = SubViewport.new()
 	_sheet_vp.size = Vector2i(720, 1280)
 	_sheet_vp.disable_3d = true
@@ -157,6 +166,9 @@ func build() -> void:
 	notice = Notice.new()
 	notice.office = office
 	office.add_child(notice)
+	disks = DiskPopup.new()
+	disks.office = office
+	office.add_child(disks)
 	title_screen = preload("res://scenes/office/busy_title.gd").new()
 	title_screen.office = office
 	title_screen.busy = self
@@ -216,6 +228,8 @@ func set_enabled(on: bool) -> void:
 		_title_done = true
 		uncover()
 		_end_visit()
+		if disks:
+			disks.clear()
 		_call_t = -1.0
 		_ring.stop()
 	if _hud:
@@ -311,6 +325,7 @@ func tick(delta: float) -> void:
 
 ## Desk wins, fake work and collaborators turn into pieces for your game.
 func _tick_pieces() -> void:
+	var before := _combo_names()
 	var got: Array = []
 	for src in gm.desk_wins(DaleStory.read_stats(), Array(office._ladder.state.beaten)):
 		var p := gm.earn(src)
@@ -323,14 +338,32 @@ func _tick_pieces() -> void:
 	got.append_array(gm.collaborate(crew().with_role("collaborator")))
 	if got.is_empty():
 		return
-	var names: Array[String] = []
+	_announce(got, before)
+
+
+## New pieces: each one a NEW DISK! pop-up (first finds go in the binder),
+## then a COMBO FOUND! for every combo that just lit up in the build.
+func _announce(got: Array, before: Array) -> void:
 	for p in got:
-		names.append("%s (%s)" % [p.name, GameMaker.KIND_NAMES[p.kind]])
-	office._toast.text = "NEW PIECE%s: %s\nBUILD YOUR GAME AT THE DEV KIT" % ["S" if got.size() > 1 else "", ", ".join(names)]
-	office._toast_time = 4.5
-	_play(preload("res://audio/coin.wav"), -2.0)
+		var src: String = p.get("from", "")
+		if src == "":
+			for q in gm.pieces:
+				if q.name == p.name:
+					src = q.from
+		disks.add_disk({"kind": p.kind, "name": p.name, "from": src}, binder.record(p.name))
+	for c in _combo_names():
+		if not before.has(c) and c != "FULL KIT":
+			disks.add_combo(c)
 	if _kit:
 		_kit.refresh()
+
+
+## The combos in the build right now.
+func _combo_names() -> Array:
+	var out: Array = []
+	for c in gm.score().combos:
+		out.append(c.name)
+	return out
 
 
 ## What you're doing, as the boss would put it.
@@ -695,6 +728,7 @@ func _fired(quote := "") -> void:
 func _start_over() -> void:
 	wd.start_over()
 	gm.reset()
+	disks.clear()
 	_go_home()
 
 
@@ -793,6 +827,7 @@ func _ship_pay(r: Dictionary) -> void:
 func _new_week(promote: bool) -> void:
 	wd.new_week(promote)
 	gm.new_week()
+	disks.clear()
 	_go_home()
 
 
@@ -1078,16 +1113,20 @@ func dev_all_pieces() -> void:
 		for p in GameMaker.SOURCES[src]:
 			gm.add(p[0], p[1], src)
 	gm.collaborate(CoworkerLines.ORDER)
+	for p in gm.pieces:
+		binder.record(p.name)
 	if _kit:
 		_kit.refresh()
 
 
 func dev_piece(src: String) -> void:
+	var before := _combo_names()
 	var p := gm.earn(src)
-	office._toast.text = "NEW PIECE: %s" % p.get("name", "(NONE LEFT)")
-	office._toast_time = 3.0
-	if _kit:
-		_kit.refresh()
+	if p.is_empty():
+		office._toast.text = "NO %s PIECES LEFT THIS WEEK" % src.to_upper()
+		office._toast_time = 3.0
+		return
+	_announce([p], before)
 
 
 func dev_clear() -> void:

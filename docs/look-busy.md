@@ -241,3 +241,18 @@ tiredness, or a night-only desk). Rules: `Workday.start_overtime()` /
 `end_overtime()`, tested in `tests/test_workday.gd`. Lights:
 `ps1.gdshader`'s `after_hours`, faded on every office material by `office.gd`
 `set_after_hours()`.
+
+## Pieces are floppy disks (2026-11-03)
+
+Every piece of your game is a 3.5" floppy disk: the plastic is its kind's
+colour, the paper label has its kind and its name in ink.
+
+| Change | Why |
+|---|---|
+| **No separate card or deck system.** The rewards are the pieces the Dev Kit already uses. | The Dev Kit is already a deckbuilder: one slot per kind, about forty pieces, combos that add or multiply, a fresh kit each week. A second reward economy would compete with it ("five half-games are worth less than one great one"). |
+| **Floppy disks, not cards, SD cards or hard drives.** You put disks into the GAMEMAKER 95 drives. | Inserting disks into a 90s PC is something you actually do in this office, and it matches the beige CRTs. SD cards belong to the 2000s and would break the look. |
+| **NEW DISK! full-screen pop-up** for every piece, with what it clicks with; **COMBO FOUND!** when two disks light up a combo. | A reward you see and hear lands harder than a toast in the corner. Showing the combos it can make points at the next desk to beat. |
+| **The disk binder keeps every disk you've ever found**, across weeks and getting fired. The weekly kit still starts empty. First finds get a fanfare. | That's the collection layer between runs, like Balatro's collection: a reason to start the next week, without making the week easier. |
+| **Star cards share the binder.** A STAR CARDS tab shows every desk's stars as a card, coloured by tier (bronze, silver, gold). | Stars are permanent mastery, pieces are this week's tools. Keeping both in one binder gives one place to see everything you've done. |
+
+Design samples: the "Look Busy — Award Cards" canvas.

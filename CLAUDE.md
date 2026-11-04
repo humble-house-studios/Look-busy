@@ -173,7 +173,16 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   you a floor (new boss). Coworker roles from trust (`Coworkers.role()`:
   lookout, collaborator, snitch if burned; side projects in
   `CoworkerLines.BUSY`), tested in `tests/test_busy_crew.gd`.
-  `tools/busy_walk.gd` (PASS/FAIL) and
+  **Pieces are floppy disks** (`scenes/office/floppy.gd`, drawn in code, kind
+  colours shared with the Dev Kit): a full-screen NEW DISK! pop-up for every
+  piece earned and COMBO FOUND! when a combo lights up
+  (`scenes/office/disk_popup.gd`, queued, waits for other windows, pauses the
+  office like busy_notice). Every piece ever found stays in the **disk
+  binder** (`engine/disk_binder.gd`, `user://disk_binder.cfg`, survives new
+  weeks and getting fired; `tests/test_disk_binder.gd`), opened with BINDER
+  on the Dev Kit, which also has a STAR CARDS tab (desk stars as cards).
+  Why: docs/look-busy.md, "Pieces are floppy disks". Screenshots + PASS/FAIL:
+  `tools/disk_shot.gd`. `tools/busy_walk.gd` (PASS/FAIL) and
   `tools/busy_shot.gd` (screenshots). Scripts that drive the office turn it
   off first (`office._busy.set_enabled(false)`).
 - **Desk stars** (`engine/desk_goals.gd`, `scenes/office/desk_card.gd`, on

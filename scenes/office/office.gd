@@ -168,7 +168,7 @@ const SETTINGS := {
 const WIPE := [
 	"user://dale.cfg", "user://ladder.cfg", "user://coworkers.cfg", "user://office_relics.cfg",
 	"user://tips.cfg", "user://save.cfg", "user://cube_desk.cfg", "user://notebook.json",
-	"user://look_busy.cfg", "user://desk_goals.cfg", "user://arcade.cfg",
+	"user://look_busy.cfg", "user://desk_goals.cfg", "user://arcade.cfg", "user://disk_binder.cfg",
 ]
 
 

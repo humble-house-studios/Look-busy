@@ -6,8 +6,13 @@ extends Control
 ## runs a short generated trailer. On Friday, SHIP IT ships the game early
 ## (otherwise it ships at 5 PM). 720x1280 in its own SubViewport on the desk's
 ## screen; Buttons only, so touch, mouse and the pad cursor all work.
+## Every piece is a floppy disk (scenes/office/floppy.gd) sitting in its drive.
+## BINDER opens the collection: every disk ever found (engine/disk_binder.gd),
+## and a STAR CARDS tab with every desk's stars (engine/desk_goals.gd).
 
 const FONT := preload("res://fonts/press_start_2p.ttf")
+const SMALL := preload("res://fonts/pixelify_sans.ttf")
+const Floppy := preload("res://scenes/office/floppy.gd")
 const W := 720.0
 const H := 1280.0
 const BG := Color(0.1, 0.09, 0.16)
@@ -34,6 +39,16 @@ var _card_t := 0.0
 var _sfx: Array[AudioStreamPlayer] = []
 var _sfx_i := 0
 var _last_score := -1
+var _row_disks := {}
+var _binder: Control
+var _binder_count: Label
+var _binder_head: Label
+var _binder_tabs: Array = []
+var _binder_disks: Control
+var _binder_stars: Control
+var _star_rows: Array = []
+var _disk_cells: Array = []
+var _binder_tab := "disks"
 
 
 func _init() -> void:
@@ -52,14 +67,19 @@ func _ready() -> void:
 	back.size = size
 	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(back)
-	var head := _label("GAMEMAKER 95", 28, PINK)
+	var head := _label("GAMEMAKER 95", 28, PINK, HORIZONTAL_ALIGNMENT_LEFT)
 	head.position = Vector2(20, 104)
-	head.size = Vector2(W - 40, 40)
+	head.size = Vector2(W - 270, 40)
 	add_child(head)
-	_info = _label("", 15, Color(0.8, 0.8, 0.9))
+	_info = _label("", 15, Color(0.8, 0.8, 0.9), HORIZONTAL_ALIGNMENT_LEFT)
 	_info.position = Vector2(20, 152)
-	_info.size = Vector2(W - 40, 50)
+	_info.size = Vector2(W - 270, 50)
 	add_child(_info)
+	var binder := _button("BINDER", Color(0.12, 0.14, 0.32), GOLD)
+	binder.position = Vector2(W - 230, 100)
+	binder.size = Vector2(210, 96)
+	binder.pressed.connect(open_binder)
+	add_child(binder)
 	_title = _label("", 30, GOLD)
 	_title.position = Vector2(20, 205)
 	_title.size = Vector2(W - 40, 90)
@@ -79,6 +99,18 @@ func _ready() -> void:
 		b.position = Vector2(20, y)
 		b.size = Vector2(W - 40, 102)
 		b.pressed.connect(_cycle.bind(kind))
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		# Room on the left for the disk in its drive.
+		for st in ["normal", "hover", "focus", "pressed", "disabled"]:
+			var box: StyleBoxFlat = b.get_theme_stylebox(st).duplicate()
+			box.content_margin_left = 116
+			b.add_theme_stylebox_override(st, box)
+		var disk: Control = Floppy.new()
+		disk.position = Vector2(14, 10)
+		disk.size = Vector2(82, 82)
+		disk.show_name = false
+		b.add_child(disk)
+		_row_disks[kind] = disk
 		add_child(b)
 		_rows[kind] = b
 		y += 114
@@ -95,6 +127,7 @@ func _ready() -> void:
 			busy.ship_now())
 	add_child(_ship)
 	_build_trailer()
+	_build_binder()
 	add_child(preload("res://scenes/pad_cursor.gd").new())
 	refresh()
 
@@ -116,6 +149,7 @@ func refresh() -> void:
 		var name: String = gm.build.get(kind, "---")
 		_rows[kind].text = "%s (%d)\n%s" % [GameMaker.KIND_NAMES[kind], have, name]
 		_rows[kind].disabled = have == 0
+		_row_disks[kind].set_piece(kind, name, not gm.build.has(kind))
 	var wd: Workday = busy.wd
 	_info.text = "%d PIECES THIS WEEK\n%s" % [gm.pieces.size(), "SHIPS TODAY 5 PM" if wd.is_friday() else "SHIPS FRIDAY 5 PM"]
 	_ship.visible = wd.is_friday()
@@ -128,8 +162,11 @@ func set_active(on: bool) -> void:
 	if on:
 		_last_score = -1
 		refresh()
-	elif _trailer and _trailer.visible:
-		_trailer.visible = false
+	else:
+		if _trailer and _trailer.visible:
+			_trailer.visible = false
+		if _binder and _binder.visible:
+			_binder.visible = false
 
 
 func _cycle(kind: String) -> void:
@@ -214,6 +251,162 @@ func _process(delta: float) -> void:
 	_trailer_label.scale = _trailer_label.scale.lerp(Vector2.ONE, minf(1.0, delta * 6.0))
 	if _card_t > (2.2 if _card_i >= _cards.size() - 2 else 1.5):
 		_next_card()
+
+
+# ---------------------------------------------------------------- binder
+
+## The binder: a full-screen page over the kit (buttons under it are skipped
+## by the pad cursor and can't be tapped).
+func _build_binder() -> void:
+	_binder = Control.new()
+	_binder.size = size
+	_binder.mouse_filter = Control.MOUSE_FILTER_STOP
+	_binder.visible = false
+	add_child(_binder)
+	var back := ColorRect.new()
+	back.color = Color(0.106, 0.137, 0.25)
+	back.size = size
+	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_binder.add_child(back)
+	_binder_head = _label("DISK BINDER", 30, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT)
+	_binder_head.position = Vector2(20, 100)
+	_binder_head.size = Vector2(W - 240, 44)
+	_binder.add_child(_binder_head)
+	_binder_count = _label("", 26, GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
+	_binder_count.position = Vector2(W - 240, 102)
+	_binder_count.size = Vector2(220, 44)
+	_binder.add_child(_binder_count)
+	var i := 0
+	for tab in [["disks", "DISKS"], ["stars", "STAR CARDS"]]:
+		var b := _button(tab[1], Color(0.16, 0.2, 0.35), Color(0.3, 0.36, 0.55))
+		b.position = Vector2(20 + i * (W - 40) * 0.5, 156)
+		b.size = Vector2((W - 40) * 0.5 - (8 if i == 0 else 0), 88)
+		b.pressed.connect(_set_tab.bind(tab[0]))
+		_binder.add_child(b)
+		_binder_tabs.append([tab[0], b])
+		i += 1
+	# Disks: five across, every piece in the game, missing ones as "???".
+	_binder_disks = Control.new()
+	_binder_disks.position = Vector2(20, 258)
+	_binder_disks.size = Vector2(W - 40, 900)
+	_binder_disks.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_binder.add_child(_binder_disks)
+	var all := DiskBinder.all_pieces()
+	var cols := 5
+	var cw := (W - 40) / cols
+	var rows := ceili(all.size() / float(cols))
+	var ch := minf(118.0, 900.0 / rows)
+	for k in all.size():
+		var cell := Control.new()
+		cell.position = Vector2((k % cols) * cw, floori(k / float(cols)) * ch)
+		cell.size = Vector2(cw, ch)
+		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var d: Control = Floppy.new()
+		d.position = Vector2((cw - 72) * 0.5, 0)
+		d.size = Vector2(72, 72)
+		d.show_name = false
+		cell.add_child(d)
+		var l := Label.new()
+		l.add_theme_font_override("font", SMALL)
+		l.add_theme_font_size_override("font_size", 17)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.position = Vector2(2, 74)
+		l.size = Vector2(cw - 4, ch - 74)
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cell.add_child(l)
+		_binder_disks.add_child(cell)
+		_disk_cells.append([all[k], d, l])
+	# Star cards: one per desk, its tier's colour, its stars and next goal.
+	_binder_stars = Control.new()
+	_binder_stars.position = Vector2(20, 258)
+	_binder_stars.size = Vector2(W - 40, 900)
+	_binder_stars.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_binder.add_child(_binder_stars)
+	var y := 0.0
+	for id in DeskGoals.ORDER:
+		var card := PanelContainer.new()
+		card.position = Vector2(0, y)
+		card.size = Vector2(W - 40, 92)
+		card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_binder_stars.add_child(card)
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 6)
+		card.add_child(col)
+		var top := HBoxContainer.new()
+		col.add_child(top)
+		var n := _label(str(DeskGoals.DESKS[id].name), 17, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT)
+		n.autowrap_mode = TextServer.AUTOWRAP_OFF
+		n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		top.add_child(n)
+		var st := _label("", 22, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT)
+		st.autowrap_mode = TextServer.AUTOWRAP_OFF
+		top.add_child(st)
+		var g := Label.new()
+		g.add_theme_font_override("font", SMALL)
+		g.add_theme_font_size_override("font_size", 24)
+		g.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		g.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_child(g)
+		_star_rows.append([id, card, n, st, g])
+		y += 100.0
+	var close := _button("BACK TO MY GAME", Color(0.3, 0.12, 0.35), PINK)
+	close.position = Vector2(20, H - 118)
+	close.size = Vector2(W - 40, 98)
+	close.pressed.connect(func():
+		_binder.visible = false
+		_play(preload("res://audio/click.wav"), -2.0))
+	_binder.add_child(close)
+
+
+func open_binder() -> void:
+	_binder.visible = true
+	_set_tab(_binder_tab)
+	_play(preload("res://audio/click.wav"), -2.0)
+
+
+func _set_tab(tab: String) -> void:
+	_binder_tab = tab
+	for t in _binder_tabs:
+		var on: bool = t[0] == tab
+		var b: Button = t[1]
+		for st in ["normal", "hover", "focus"]:
+			b.add_theme_stylebox_override(st, _box(GOLD if on else Color(0.16, 0.2, 0.35), GOLD if on else Color(0.3, 0.36, 0.55)))
+		b.add_theme_color_override("font_color", Color(0.1, 0.07, 0.03) if on else Color.WHITE)
+	_binder_disks.visible = tab == "disks"
+	_binder_head.text = "DISK BINDER" if tab == "disks" else "STAR CARDS"
+	_binder_stars.visible = tab == "stars"
+	if tab == "disks":
+		var bd: DiskBinder = busy.binder if busy else DiskBinder.new()
+		_binder_count.text = "%d/%d" % [bd.count(), DiskBinder.total()]
+		for c in _disk_cells:
+			var have := bd.has(c[0].name)
+			c[1].set_piece(c[0].kind, c[0].name, not have)
+			c[2].text = c[0].name if have else GameMaker.KIND_NAMES[c[0].kind]
+			c[2].add_theme_color_override("font_color", Color.WHITE if have else Color(0.55, 0.53, 0.65))
+	else:
+		var stats := _star_stats()
+		var tot := DeskGoals.total(stats[0], stats[1], stats[2])
+		_binder_count.text = "%d/%d" % [tot.x, tot.y]
+		for r in _star_rows:
+			var n := DeskGoals.stars(r[0], stats[0], stats[1], stats[2])
+			var tier: Color = [Color(0.2, 0.22, 0.3), Color(0.55, 0.33, 0.18), Color(0.45, 0.52, 0.6), Color(0.62, 0.45, 0.08)][n]
+			var box := _box(tier, tier.lightened(0.35) if n > 0 else Color(0.32, 0.35, 0.48))
+			box.set_content_margin_all(12)
+			r[1].add_theme_stylebox_override("panel", box)
+			r[3].text = DeskGoals.star_text(n)
+			r[3].add_theme_color_override("font_color", GOLD if n == 3 else Color.WHITE)
+			var next := DeskGoals.next_goal(r[0], stats[0], stats[1], stats[2])
+			r[4].text = "MASTERED" if next.is_empty() else "NEXT: " + str(next.text)
+			r[4].add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
+
+
+## [stats, best, beaten], as the desk stars read them.
+func _star_stats() -> Array:
+	var st: LadderState = null
+	if busy and busy.office and busy.office._ladder:
+		st = busy.office._ladder.state
+	return [DaleStory.read_stats(), st.best if st else {}, Array(st.beaten) if st else []]
 
 
 # ---------------------------------------------------------------- kit

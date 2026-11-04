@@ -11,6 +11,7 @@ const ON := true
 const SAVES := [
 	"user://dale.cfg", "user://ladder.cfg", "user://coworkers.cfg",
 	"user://office_relics.cfg", "user://tips.cfg", "user://look_busy.cfg", "user://desk_goals.cfg", "user://arcade.cfg",
+	"user://disk_binder.cfg",
 ]
 const MACHINES := ["claw", "pusher", "ragdoll"]
 
