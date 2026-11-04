@@ -7,8 +7,11 @@ extends "res://scenes/ladder/machine.gd"
 ## kick). Hold < or > in the air to drift and cartwheel him into the
 ## bumpers on the glass. Points for the best height, each bumper, each full
 ## flip (double with Bernie's style perk), hard knocks off the glass, and
-## ringing the bell at the top. Tickets = points / 20; 900 beats the machine.
-## A round is ArcadeRules.RAGDOLL_KICKS bounces.
+## ringing the bell at the top. Tickets = points / 50; 1500 beats the machine.
+## A round is ArcadeRules.RAGDOLL_KICKS bounces. PERFECT bounces back to
+## back chain a multiplier (x1.25 up to x2.5) on everything he hits; one bumper
+## is lit as the TARGET (triple points, then another lights); the bell gives
+## a bounce back (twice a round). Missions in engine/arcade_missions.gd.
 
 const SEAT := {"at": Vector3(0, 1.55, 0.85), "size": Vector2(1.4, 2.4889), "tilt": 0.0}
 ## The column inside, cabinet metres: centred on x = z = 0.
@@ -43,6 +46,10 @@ var _impacts := 0.0
 var _spin := 0.0
 var _bumps := 0
 var _bells := 0
+## Points from hits (chain multiplied), PERFECTs in a row, the lit bumper.
+var _hits := 0
+var _perfects := 0
+var _target := 0
 var _best_h := 0.0
 var _last_v := Vector3.ZERO
 var _last_score := 0
@@ -77,6 +84,7 @@ var _right: Button
 func _ready() -> void:
 	super._ready()
 	_rng.randomize()
+	machine_id = "ragdoll"
 	frame("FALL GUY", Color.TRANSPARENT, Color(1.0, 0.7, 0.35))
 	_live = label("", 22, Color(1.0, 0.9, 0.6))
 	_live.add_theme_color_override("font_outline_color", Color.BLACK)
@@ -405,6 +413,8 @@ func _on_launch() -> void:
 	_spin = 0.0
 	_bumps = 0
 	_bells = 0
+	_hits = 0
+	_perfects = 0
 	_best_h = 0.0
 	_cool = 0.0
 	_touching = false
@@ -469,9 +479,17 @@ func _on_bounce() -> bool:
 	_torso.angular_velocity += Vector3(_rng.randf_range(-2.5, 2.5), 0, _rng.randf_range(-2.5, 2.5) - lean * 6.0)
 	_mat_dip = 1.0
 	if q > 0.75:
-		_say("PERFECT!", Color(0.5, 1.0, 0.5))
-		sfx("laugh_small", -8.0)
-	elif q > 0.4:
+		_perfects += 1
+		var x := ArcadeRules.ragdoll_chain_x(_perfects)
+		_say("PERFECT!" if _perfects < 2 else "PERFECT x%s!" % _chain_text(x), Color(0.5, 1.0, 0.5))
+		sfx("laugh_small", -8.0, 1.0 + _perfects * 0.05)
+		mission_event("perfects", _perfects)
+		sfx("thump", -2.0, 1.2)
+		return true
+	if _perfects >= 2:
+		sfx("groan", -10.0)
+	_perfects = 0
+	if q > 0.4:
 		_say("GOOD", Color(0.9, 1.0, 0.6))
 	else:
 		_say("EARLY" if _low() > TOUCH else "LATE", Color(1.0, 0.8, 0.5))
@@ -485,13 +503,29 @@ func _say(text: String, color: Color) -> void:
 	_call_t = 0.8
 
 
+func _chain_text(x: float) -> String:
+	return ("%d" % x) if is_equal_approx(x, roundf(x)) else ("%.1f" % x)
+
+
 func _on_bumper(body: Node, i: int) -> void:
 	if not _playing or not body in _parts or _bumper_cool[i] > 0.0:
 		return
 	_bumper_cool[i] = 0.35
 	_bumper_glow[i] = 1.0
 	_bumps += 1
-	sfx("ding", -6.0, 1.0 + 0.1 * i)
+	if i == _target:
+		var pts := ArcadeRules.ragdoll_hit("target", _perfects)
+		_hits += pts
+		banner("TARGET!\n+%d" % pts, 1.2, Color(1.0, 0.5, 0.3))
+		sfx("jackpot", -8.0, 1.2)
+		mission_event("target")
+		var next := _target
+		while next == _target:
+			next = _rng.randi() % BUMPERS.size()
+		_target = next
+	else:
+		_hits += ArcadeRules.ragdoll_hit("bumper", _perfects)
+		sfx("ding", -6.0, 1.0 + 0.1 * i)
 
 
 func _on_bell(body: Node) -> void:
@@ -500,8 +534,14 @@ func _on_bell(body: Node) -> void:
 	_bell_cool = 0.8
 	_bell_swing = 1.0
 	_bells += 1
+	var pts := ArcadeRules.ragdoll_hit("bell", _perfects)
+	_hits += pts
+	var more := _bells <= ArcadeRules.RAGDOLL_BELL_KICKS
+	if more:
+		_kicks += 1
 	sfx("jackpot", -4.0)
-	banner("DING DING DING!\n+%d" % ArcadeRules.RAGDOLL_BELL, 1.4)
+	banner("DING DING DING!\n+%d%s" % [pts, "  +1 BOUNCE" if more else ""], 1.4)
+	mission_event("bell", _bells)
 
 
 # ---------------------------------------------------------------- input
@@ -591,7 +631,7 @@ func _spins() -> int:
 
 func _score() -> int:
 	var style: bool = hub != null and hub.state.has("style")
-	return ArcadeRules.ragdoll_score(_best_h, _impacts, _spins(), style, _bumps, _bells)
+	return ArcadeRules.ragdoll_score(_best_h, _impacts, _spins(), style, _hits)
 
 
 func _land() -> void:
@@ -620,7 +660,8 @@ func _process(delta: float) -> void:
 	if _playing and _torso:
 		# Again just before drawing, so a hard hit never shows a gap.
 		_hold_together()
-		_live.text = "BOUNCES %d   %d POINTS" % [_kicks, _score()]
+		var x := ArcadeRules.ragdoll_chain_x(_perfects)
+		_live.text = "BOUNCES %d   %d PTS%s" % [_kicks, _score(), "   x%s" % _chain_text(x) if x > 1.0 else ""]
 		# The button lights up while a kick would count.
 		_go.modulate = Color(1.3, 1.3, 0.9) if _kick_window() else Color.WHITE
 	else:
@@ -632,7 +673,8 @@ func _process(delta: float) -> void:
 	for i in _bumper_mats.size():
 		_bumper_cool[i] = maxf(0.0, _bumper_cool[i] - delta)
 		_bumper_glow[i] = maxf(0.0, _bumper_glow[i] - delta * 3.0)
-		_bumper_mats[i].set_shader_parameter("emission", Color(1.0, 0.9, 0.5) * _bumper_glow[i])
+		var lit := Color(0.9, 0.9, 1.0) * (0.45 + 0.35 * sin(Time.get_ticks_msec() * 0.012)) if i == _target else Color.BLACK
+		_bumper_mats[i].set_shader_parameter("emission", lit + Color(1.0, 0.9, 0.5) * _bumper_glow[i])
 	_bell_cool = maxf(0.0, _bell_cool - delta)
 	_bell_swing = maxf(0.0, _bell_swing - delta * 0.7)
 	_bell.rotation.z = sin(Time.get_ticks_msec() * 0.02) * 0.35 * _bell_swing

@@ -222,7 +222,19 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   harder), lean into the bumpers, ring the bell. `godot --headless --fixed-fps
   60 -s res://tools/cage_check.gd` plays all three and prints PASS/FAIL
   (strong grabs land, coins pay, the dummy stays in the glass and in one
-  piece); with a display and `OUT=` it saves seat-view shots. The
+  piece); with a display and `OUT=` it saves seat-view shots. **Fun pass:**
+  each machine has a skill hook, a variable reward and something to chase:
+  claw = PLAY then a 15 s steer clock, a glowing BONUS prize (x2) each play,
+  mystery capsules, DOUBLE GRAB, win streaks, SO CLOSE near-misses; pusher =
+  a lit BONUS zone on the chute rail (shower / mega push / token chip / gold
+  coin, then it recharges), one-shove streaks x2/x3; Fall Guy = PERFECT
+  chains (x1.25 to x2.5 on hits), a lit TARGET bumper (x3), the bell gives a
+  bounce back. All three: missions (`engine/arcade_missions.gd`,
+  `user://arcade.cfg`, `hub.missions`, `mission_event()` in machine.gd), BEST
+  WIN on the overlay and a NEW BEST! flash. Numbers in `arcade_rules.gd`,
+  tested in `tests/test_arcade.gd`; `godot --headless --fixed-fps 60 -s
+  res://tools/arcade_tune.gd` plays each machine at three skill levels and
+  prints tickets per token (aim ~10-15 new, ~25-40 good; DOOR KEY is 300). The
   corner-office golf (CORNER LINKS, 3 holes) still builds its own little world
   on its screen with `scenes/ladder/view3d.gd` (`retro_post.gdshader`
   grain/scanlines); `tools/machine_shot.gd` shoots it on its own. Rooms get their own lights

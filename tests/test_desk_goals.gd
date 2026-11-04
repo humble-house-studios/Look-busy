@@ -22,7 +22,7 @@ func test_next_goal_shows_progress_on_counting_goals() -> void:
 func test_arcade_stars_from_best_wins_and_beaten() -> void:
 	assert_eq(DeskGoals.stars("claw", {}, {"claw": 60}, []), 2)
 	assert_eq(DeskGoals.stars("claw", {}, {"claw": 150}, ["claw"]), 3)
-	assert_eq(DeskGoals.stars("ragdoll", {}, {"ragdoll": ArcadeRules.ragdoll_tickets(450)}, []), 2, "450 points is the second star")
+	assert_eq(DeskGoals.stars("ragdoll", {}, {"ragdoll": ArcadeRules.ragdoll_tickets(750)}, []), 2, "750 points is the second star")
 	assert_eq(DeskGoals.stars("pusher", {}, {"pusher": ArcadeRules.PUSHER_BUNDLE}, []), 2)
 
 

@@ -39,6 +39,13 @@ var _sfx_i := 0
 var _top: Label
 var _banner: Label
 var _banner_time := 0.0
+## Glass-cage machines: which one (for missions and bests), the mission
+## line, the NEW BEST! flash.
+var machine_id := ""
+var _mission: Label
+var _best_lbl: Label
+var _best_t := 0.0
+var _own_missions: ArcadeMissions
 
 
 func _init() -> void:
@@ -134,7 +141,7 @@ func frame(title: String, bg: Color, title_color: Color) -> void:
 		var strip := Panel.new()
 		strip.add_theme_stylebox_override("panel", box(Color(0.02, 0.01, 0.04, 0.72), Color(title_color, 0.6), 3, 10))
 		strip.position = Vector2(236, 26)
-		strip.size = Vector2(W - 256, 72)
+		strip.size = Vector2(W - 256, 96)
 		strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(strip)
 	# Right of the office's STAND UP button, which sits over the top-left
@@ -146,9 +153,27 @@ func frame(title: String, bg: Color, title_color: Color) -> void:
 	_top = label("", 20, Color(1.0, 0.92, 0.55), HORIZONTAL_ALIGNMENT_RIGHT)
 	_top.position = Vector2(250, 100)
 	if bg.a <= 0.0:
-		# The cabinet's own marquee shows the name: just the tokens here.
+		# The cabinet's own marquee shows the name: just the tokens, your
+		# best win and the current mission here.
 		t.visible = false
-		_top.position = Vector2(250, 42)
+		_top.add_theme_font_size_override("font_size", 16)
+		_top.position = Vector2(250, 40)
+		_top.size.y = 76
+		_mission = label("", 16, Color(0.45, 1.0, 0.95))
+		_mission.add_theme_color_override("font_outline_color", Color.BLACK)
+		_mission.add_theme_constant_override("outline_size", 8)
+		_mission.position = Vector2(20, 168)
+		_mission.size = Vector2(W - 40, 50)
+		add_child(_mission)
+		_best_lbl = label("NEW BEST!", 46, Color(1.0, 0.85, 0.2))
+		_best_lbl.add_theme_color_override("font_outline_color", Color(0.4, 0.1, 0.0))
+		_best_lbl.add_theme_constant_override("outline_size", 14)
+		_best_lbl.position = Vector2(0, 250)
+		_best_lbl.size = Vector2(W, 70)
+		_best_lbl.pivot_offset = Vector2(W * 0.5, 35)
+		_best_lbl.modulate.a = 0.0
+		_best_lbl.z_index = 51
+		add_child(_best_lbl)
 	_top.size = Vector2(W - 270, 40)
 	add_child(_top)
 	_banner = label("", 40, Color(1.0, 0.9, 0.3))
@@ -166,6 +191,34 @@ func frame(title: String, bg: Color, title_color: Color) -> void:
 func refresh_top() -> void:
 	if _top and hub:
 		_top.text = "TOKENS %d  TICKETS %d" % [hub.state.tokens, hub.state.tickets]
+		if machine_id != "":
+			var best := int(hub.state.best.get(machine_id, 0))
+			_top.text += "\nBEST WIN %d" % best if best > 0 else "\nNO WINS YET"
+	if _mission and machine_id != "":
+		_mission.text = missions().text(machine_id)
+
+
+## The arcade's missions (the ladder's, or a scratch copy without one).
+func missions() -> ArcadeMissions:
+	if hub and "missions" in hub and hub.missions:
+		return hub.missions
+	if _own_missions == null:
+		_own_missions = ArcadeMissions.new("user://arcade_scratch.cfg")
+	return _own_missions
+
+
+## Something mission-worthy happened; pays and cheers if it finished one.
+func mission_event(key: String, value := 1) -> void:
+	if machine_id == "":
+		return
+	var m := missions().event(machine_id, key, value)
+	if m.is_empty():
+		return
+	if hub:
+		hub.win_tickets(int(m.tickets), "", false)
+	sfx("fanfare", -4.0)
+	banner("MISSION DONE!\n%s\n+%d TICKETS" % [m.text, m.tickets], 2.8, Color(0.45, 1.0, 0.95))
+	refresh_top()
 
 
 ## A big message across the middle that fades.
@@ -185,6 +238,10 @@ func _process(delta: float) -> void:
 		_banner_time -= delta
 		_banner.modulate.a = clampf(_banner_time * 2.0, 0.0, 1.0)
 		_banner.scale = _banner.scale.lerp(Vector2.ONE, minf(1.0, delta * 10.0))
+	if _best_lbl and _best_t > 0.0:
+		_best_t -= delta
+		_best_lbl.modulate.a = clampf(_best_t * 2.0, 0.0, 1.0)
+		_best_lbl.scale = Vector2.ONE * (1.0 + 0.08 * sin(_best_t * 18.0))
 
 
 ## Pay one token for a play. Shows the petty-cash hint when you're out.
@@ -202,7 +259,12 @@ func pay_token() -> bool:
 
 func win(tickets: int, machine: String, beats := false) -> void:
 	if hub:
+		var old := int(hub.state.best.get(machine, 0))
 		hub.win_tickets(tickets, machine, beats)
+		# Beat your own biggest win on this machine: say so.
+		if old > 0 and tickets > old and _best_lbl:
+			_best_t = 2.2
+			sfx("cheer", -6.0)
 	refresh_top()
 
 

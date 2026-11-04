@@ -1,8 +1,9 @@
 extends "res://scenes/ladder/machine.gd"
 ## CLAW KING: a real claw machine in a glass cage in the arcade
 ## (scenes/ladder/cage3d.gd: you can see the prizes from across the room).
-## Steer the claw (on-screen arrows, stick, D-pad, arrow keys/WASD), DROP
-## (1 token): it lowers until it bumps the pile, closes its three prongs until
+## PLAY (1 token) starts a 15-second clock (ArcadeRules.CLAW_TIMER): steer
+## the claw (on-screen arrows, stick, D-pad, arrow keys/WASD) and DROP before
+## it runs out (or it drops itself). It lowers until it bumps the pile, closes its three prongs until
 ## they touch something, lifts, and always carries back to the chute and
 ## opens. Nothing is faked: the prongs are kinematic bodies and the prize is
 ## held only by where they closed, so a grab on the edge of a duck tips it out.
@@ -10,6 +11,10 @@ extends "res://scenes/ladder/machine.gd"
 ## others the claw goes slack partway up (CLAW_WEAK_HOLD) and what it holds
 ## usually slips. Prizes that drop down the chute pay tickets and roll out
 ## into the tray in the cabinet's front; the TOP-SHELF STAR beats the machine.
+## Each play lights one prize as the BONUS (pays double), mystery capsules
+## pay 15-300 at random, two prizes from one drop pay half as much again,
+## and the missions (engine/arcade_missions.gd) give you the next thing to go
+## for. A prize lost near the chute gets a SO CLOSE.
 ## Gloria's Eye (her perk) lights the claw head green at full strength.
 
 ## The rect (cabinet metres) the seated camera frames and these controls are
@@ -47,6 +52,7 @@ const CURL := 0.8
 const RIDE := 0.08
 const KEEP := 14
 const STAR_KEEP := 2
+const CAPSULE_KEEP := 2
 
 enum S { IDLE, DROP, CLOSE, RISE, CARRY, OPEN_UP }
 
@@ -95,11 +101,24 @@ var _drop: Button
 var _rng := RandomNumberGenerator.new()
 var _t := 0.0
 var _flash := 0.0
+## Paid and steering, with this many seconds left on the clock.
+var _credit := false
+var _clock := 0.0
+var _beep := 0
+## This play's glowing bonus prize, and the star that marks it.
+var _bonus: RigidBody3D
+var _bonus_mark: Label3D
+var _bonus_at := Vector3.ZERO
+## What this drop landed (tickets each), and drops landed in a row.
+var _drop_won: Array[int] = []
+var _settle := -1.0
+var _win_streak := 0
 
 
 func _ready() -> void:
 	super._ready()
 	_rng.randomize()
+	machine_id = "claw"
 	frame("CLAW KING", Color.TRANSPARENT, Color(1.0, 0.4, 0.75))
 	_grip = label("", 20, Color(0.6, 1.0, 0.7))
 	_grip.add_theme_color_override("font_outline_color", Color.BLACK)
@@ -109,7 +128,7 @@ func _ready() -> void:
 	add_child(_grip)
 	_controls()
 	pad.hold = true
-	pad.guide = [["L", "Move the claw"], ["DPAD", "Move the claw"], ["A", "Drop"]]
+	pad.guide = [["L", "Move the claw"], ["DPAD", "Move the claw"], ["A", "Play / drop"]]
 	if cage:
 		_build()
 	_update_grip()
@@ -125,6 +144,12 @@ func _build() -> void:
 	_v.set_light(4, TRAY + Vector3(0, 0.12, 0.05), Color(1.0, 0.8, 0.4), 0.35, 0.8)
 	_build_box()
 	_build_claw()
+	_bonus_mark = _v.text("BONUS", Vector3.ZERO, 22, Color(1.0, 0.9, 0.3), null, Vector3.ZERO, 0.0018)
+	_bonus_mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_bonus_mark.outline_size = 6
+	_bonus_mark.outline_modulate = Color(0.4, 0.1, 0.0)
+	_bonus_mark.no_depth_test = true
+	_bonus_mark.visible = false
 	for i in KEEP:
 		_spawn(_kind_for(i), _random_spot(FLOOR + 0.12 + i * 0.07))
 
@@ -132,6 +157,8 @@ func _build() -> void:
 func _kind_for(i: int) -> String:
 	if i < STAR_KEEP:
 		return "star"
+	if i < STAR_KEEP + CAPSULE_KEEP:
+		return "capsule"
 	return "bear" if i % 3 == 0 else "duck"
 
 
@@ -261,7 +288,7 @@ func _build_claw() -> void:
 
 func _spawn(kind: String, at: Vector3) -> void:
 	var v = _v
-	var r := 0.068 if kind == "duck" else (0.075 if kind == "bear" else 0.07)
+	var r: float = {"duck": 0.068, "bear": 0.075, "capsule": 0.064}.get(kind, 0.07)
 	var b: RigidBody3D = v.rigid(at, 0.18, 1.0, 0.05)
 	b.rotation = Vector3(_rng.randf_range(-0.4, 0.4), _rng.randf() * TAU, _rng.randf_range(-0.4, 0.4))
 	b.set_meta("kind", kind)
@@ -298,6 +325,13 @@ func _spawn(kind: String, at: Vector3) -> void:
 				v.ball(r * 0.3, Vector3(s * r * 0.7, -r * 0.55, r * 0.35), fur, b, 6)
 			v.ball(r * 0.25, Vector3(0, r * 0.85, r * 0.6), v.mat(Color(0.9, 0.75, 0.55)), b, 6)
 			v.box(Vector3(r * 0.9, r * 0.25, 0.01), Vector3(0, r * 0.35, r * 0.95), v.mat(Color(0.9, 0.15, 0.3)), b)
+		"capsule":
+			var shell: ShaderMaterial = v.mat(Color(0.3, 0.85, 1.0), {"shine": 2.2, "glow": Color(0.04, 0.12, 0.18)})
+			var cap: ShaderMaterial = v.mat(Color(1.0, 0.35, 0.7), {"shine": 2.2})
+			v.ball(r, Vector3.ZERO, shell, b, 10)
+			v.ball(r * 1.01, Vector3(0, r * 0.45, 0), cap, b, 10).scale = Vector3(1, 0.6, 1)
+			v.cyl(r * 1.04, r * 1.04, r * 0.18, Vector3.ZERO, v.mat(Color(0.95, 0.95, 1.0), {"shine": 1.0}), b, Vector3.ZERO, 12)
+			v.text("?", Vector3(0, -r * 0.2, r + 0.002), 34, Color(1, 1, 1), b, Vector3.ZERO, 0.0016)
 		_:
 			var gold: ShaderMaterial = v.mat(Color(1.0, 0.8, 0.1), {"shine": 2.0, "glow": Color(0.35, 0.25, 0.0)})
 			v.ball(r, Vector3.ZERO, gold, b, 6)
@@ -332,7 +366,7 @@ func _controls() -> void:
 		var dir: Vector2 = d[1]
 		b.button_down.connect(func(): _dir = dir)
 		b.button_up.connect(func(): _dir = Vector2.ZERO)
-	_drop = button("DROP", 44, Color(0.55, 0.1, 0.3, 0.88))
+	_drop = button("PLAY\n1 TOKEN", 36, Color(0.55, 0.1, 0.3, 0.88))
 	_drop.position = Vector2(436, 1012)
 	_drop.size = Vector2(258, 242)
 	_drop.custom_minimum_size = Vector2(258, 242)
@@ -422,11 +456,21 @@ func _clamped(p: Vector2) -> Vector2:
 	return Vector2(clampf(p.x, X0 + 0.11, X1 - 0.11), clampf(p.y, Z0 + 0.11, Z1 - 0.11))
 
 
+## The big button: PLAY (a token, starts the clock), then DROP.
 func _on_drop() -> void:
-	if _state != S.IDLE or cage == null:
+	if _state != S.IDLE or cage == null or _settle > 0.0:
 		return
-	if not pay_token():
+	if not _credit:
+		if not pay_token():
+			return
+		_credit = true
+		_clock = ArcadeRules.CLAW_TIMER
+		_beep = 5
+		_pick_bonus()
+		sfx("chime", -6.0)
 		return
+	_credit = false
+	_drop_won.clear()
 	_strong = ArcadeRules.claw_strong(_grabs)
 	_grabs += 1
 	_state = S.DROP
@@ -528,8 +572,19 @@ func _physics_process(delta: float) -> void:
 	var want := Vector2.ZERO
 	match _state:
 		S.IDLE:
-			want = _steer() * SPEED
 			_move_prongs(OPEN, 2.0, delta)
+			if _credit:
+				want = _steer() * SPEED
+				_clock -= delta
+				if _clock <= _beep and _beep > 0:
+					sfx("click", -4.0, 1.6)
+					_beep -= 1
+				if _clock <= 0.0:
+					_on_drop()
+			elif _settle > 0.0:
+				_settle -= delta
+				if _settle <= 0.0:
+					_end_drop()
 		S.DROP:
 			var next := _head_y - DROP_SPEED * delta
 			if _blocked_below(next):
@@ -577,6 +632,7 @@ func _physics_process(delta: float) -> void:
 			_move_prongs(OPEN, 2.5, delta)
 			if _timer > 0.9:
 				_state = S.IDLE
+				_settle = 0.8
 				_update_grip()
 	# The carriage speeds up and slows down; the head swings on its cable.
 	var was := _vel
@@ -626,8 +682,13 @@ func _check_slip() -> void:
 		return
 	if not is_instance_valid(_lifted) or _lifted.position.y < _head_y - 0.3:
 		_lifted = null
-		banner("IT SLIPPED!", 1.2, Color(1.0, 0.6, 0.5))
-		sfx("groan", -10.0)
+		var up := (_head_y - _rise_from) / maxf(0.01, HEAD_Y - _rise_from)
+		if _state == S.CARRY or up > 0.75:
+			banner("SO CLOSE!", 1.6, Color(1.0, 0.5, 0.4))
+			sfx("sad_trombone", -8.0)
+		else:
+			banner("IT SLIPPED!", 1.2, Color(1.0, 0.6, 0.5))
+			sfx("groan", -10.0)
 
 
 ## Prizes that fell down the chute pay out and roll into the tray; the cage
@@ -654,10 +715,26 @@ func _won(p: RigidBody3D) -> void:
 	var kind: String = p.get_meta("kind")
 	var t := ArcadeRules.claw_tickets(kind)
 	var beats := ArcadeRules.claw_beats(kind)
+	var line := "%s!" % ArcadeRules.CLAW_PRIZES[kind].name
+	if kind == "capsule":
+		t = ArcadeRules.claw_capsule(_rng.randf())
+		line = "MYSTERY CAPSULE:\n%s" % ("JACKPOT!" if t >= 150 else ("NICE!" if t >= 80 else "OPENED"))
+	var bonus := p == _bonus
+	if bonus:
+		t *= ArcadeRules.CLAW_BONUS_X
+		line = "BONUS PRIZE x%d!\n%s" % [ArcadeRules.CLAW_BONUS_X, ArcadeRules.CLAW_PRIZES[kind].name]
+		_bonus = null
+		_bonus_mark.visible = false
 	win(t, "claw", beats)
-	sfx("jackpot" if beats else "ding")
-	banner("%s!\n+%d TICKETS" % [ArcadeRules.CLAW_PRIZES[kind].name, t], 2.4)
+	_drop_won.append(t)
+	sfx("jackpot" if beats or bonus or t >= 80 else "ding")
+	banner("%s\n+%d TICKETS" % [line, t], 2.4)
 	_flash = 1.0
+	mission_event("won")
+	if bonus:
+		mission_event("bonus")
+	if kind == "capsule":
+		mission_event("capsule")
 	# Out into the tray behind the little door, to look at for a bit.
 	for e in _tray:
 		e.t = minf(e.t, 0.5)
@@ -668,8 +745,47 @@ func _won(p: RigidBody3D) -> void:
 	for q in _prizes:
 		if q.get_meta("kind") == "star":
 			stars += 1
-	var kind_new := "star" if stars < STAR_KEEP else ("bear" if _rng.randf() < 0.35 else "duck")
+	var caps := 0
+	for q in _prizes:
+		if q.get_meta("kind") == "capsule":
+			caps += 1
+	var kind_new := "star" if stars < STAR_KEEP else ("capsule" if caps < CAPSULE_KEEP else ("bear" if _rng.randf() < 0.35 else "duck"))
 	_spawn(kind_new, _random_spot(TOP - 0.15))
+
+
+## A play's bonus prize: one on the pile the claw can reach (not the stars).
+func _pick_bonus() -> void:
+	var options: Array[RigidBody3D] = []
+	for p in _prizes:
+		var at := p.position
+		if p.get_meta("kind") != "star" and at.y < FLOOR + 0.25 and absf(at.x) < X1 - 0.1 \
+				and at.z > Z0 + 0.1 and at.z < Z1 - 0.1 and (at.x > CHUTE.end.x + 0.08 or at.z < CHUTE.position.y - 0.08):
+			options.append(p)
+	_bonus = options[_rng.randi() % options.size()] if not options.is_empty() else null
+	_bonus_mark.visible = _bonus != null
+
+
+## A drop is over (and whatever it knocked loose has landed): doubles,
+## streaks, the bonus moves on.
+func _end_drop() -> void:
+	if _drop_won.size() >= 2:
+		var sum := 0
+		for t in _drop_won:
+			sum += t
+		var extra := int(sum * (ArcadeRules.CLAW_DOUBLE_X - 1.0))
+		win(extra, "", false)
+		banner("DOUBLE GRAB!\n+%d MORE" % extra, 2.6, Color(1.0, 0.6, 1.0))
+		sfx("laugh_big", -6.0)
+		mission_event("double", _drop_won.size())
+	if _drop_won.is_empty():
+		_win_streak = 0
+	else:
+		_win_streak += 1
+		mission_event("streak", _win_streak)
+	_drop_won.clear()
+	_bonus = null
+	_bonus_mark.visible = false
+	_update_grip()
 
 
 # ---------------------------------------------------------------- drawing
@@ -689,7 +805,27 @@ func _process(delta: float) -> void:
 	# The aiming laser and the claw's shadow on whatever is below.
 	var hit: Dictionary = _v.ray(head - Vector3(0, HEAD_H * 0.5, 0), Vector3(head.x, FLOOR - 0.2, head.z), _claw_rids)
 	var ground: float = hit.position.y if hit else FLOOR - 0.035
-	_laser.visible = _state == S.IDLE
+	_laser.visible = _state == S.IDLE and _credit
+	# The bonus prize: a pulsing tag over it, and a gold light on it.
+	if _bonus and is_instance_valid(_bonus):
+		_bonus_mark.position = _bonus.position + Vector3(0, 0.13, 0)
+		_bonus_mark.scale = Vector3.ONE * (1.0 + 0.15 * sin(_t * 8.0))
+		if _bonus.position.distance_to(_bonus_at) > 0.01:
+			_bonus_at = _bonus.position
+			_v.set_light(5, _bonus_at + Vector3(0, 0.1, 0.05), Color(1.0, 0.85, 0.3), 0.22, 1.4)
+	elif _bonus_at != Vector3.ZERO:
+		_bonus_at = Vector3.ZERO
+		_v.set_light(5, Vector3.ZERO, Color.BLACK, 0.0)
+	# The big button and the clock.
+	if _credit:
+		_drop.text = "DROP!\n%d" % ceili(maxf(_clock, 0.0))
+		_drop.modulate = Color(1.4, 1.0, 1.0) if _clock < 5.0 and int(_clock * 4.0) % 2 == 0 else Color.WHITE
+	elif _state == S.IDLE and _settle <= 0.0:
+		_drop.text = "PLAY\n1 TOKEN"
+		_drop.modulate = Color.WHITE
+	else:
+		_drop.text = "..."
+		_drop.modulate = Color(0.7, 0.7, 0.7)
 	var drop := maxf(0.01, head.y - HEAD_H * 0.5 - ground)
 	_laser.position = Vector3(head.x, ground + drop * 0.5, head.z)
 	_laser.scale = Vector3(1, drop, 1)
@@ -707,8 +843,8 @@ func _process(delta: float) -> void:
 
 func _update_grip() -> void:
 	if hub == null or not hub.state.has("gloria_eye"):
-		_grip.text = "STEER  ^ v < >  THEN DROP"
-		_grip.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
+		_grip.text = "WIN STREAK x%d!" % _win_streak if _win_streak >= 2 else "PLAY, STEER, DROP"
+		_grip.add_theme_color_override("font_color", Color(1.0, 0.8, 0.3) if _win_streak >= 2 else Color(1, 1, 1, 0.85))
 		return
 	var strong := ArcadeRules.claw_strong(_grabs)
 	var left := (ArcadeRules.CLAW_STRONG_EVERY - 1 - _grabs % ArcadeRules.CLAW_STRONG_EVERY)

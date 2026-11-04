@@ -16,12 +16,14 @@ const SAVE := "user://cage_check.cfg"
 class FakeHub extends Node:
 	var state: LadderState
 	var wins: Array = []
+	var missions := ArcadeMissions.new("user://cage_check_missions.cfg")
 
 	func spend_token() -> bool:
 		return state.spend_token()
 
 	func win_tickets(n: int, machine: String, beats: bool) -> void:
-		wins.append([n, machine, beats])
+		if machine != "":
+			wins.append([n, machine, beats])
 		state.win_tickets(n, machine)
 
 
@@ -49,6 +51,7 @@ func _init() -> void:
 	await process_frame
 	out = OS.get_environment("OUT")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://cage_check_missions.cfg"))
 	hub = FakeHub.new()
 	hub.state = LadderState.new(SAVE)
 	hub.state.tokens = 999
@@ -161,6 +164,7 @@ func _claw() -> void:
 			m._grabs = 3 if kind == "strong" else 0
 			var before: int = hub.wins.size()
 			m._on_drop()
+			m._on_drop()
 			var t := 0
 			while m._state != m.S.IDLE and t < 1500:
 				await physics_frame
@@ -244,7 +248,7 @@ func _ragdoll() -> void:
 			await _shot("ragdoll_up")
 		if t == 400:
 			await _shot("ragdoll_mid")
-	print("      ragdoll: %d kicks, top %.2f m, score %d (height %.2f, knocks %d, flips %d, bumps %d, bells %d), worst joint gap %.3f" % [kicks, top, m._last_score, m._best_h, m._impacts, m._spins(), m._bumps, m._bells, apart])
+	print("      ragdoll: %d kicks, top %.2f m, score %d (height %.2f, knocks %d, flips %d, bumps %d, bells %d, hits %d), worst joint gap %.3f" % [kicks, top, m._last_score, m._best_h, m._impacts, m._spins(), m._bumps, m._bells, m._hits, apart])
 	check(not m._playing, "the round ends")
 	check(hub.wins.size() > before, "the round pays out")
 	check(top > m.MAT_Y + 0.9, "timed bounces send him up the column (%.2f m)" % top)

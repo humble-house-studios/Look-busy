@@ -92,6 +92,12 @@ func spend_token() -> bool:
 	return true
 
 
+## A play back (the coin pusher's token chip).
+func give_token(n := 1) -> void:
+	tokens += n
+	save()
+
+
 func petty_cash() -> int:
 	if tokens > 0:
 		return 0

@@ -114,7 +114,7 @@ const PEOPLE := {
 		"rewards": [
 			{"line": "You made me laugh. HR has a petty-cash drawer. Take five tokens.", "reward": "tokens:5"},
 			{"line": "Between us: I pulled Dale's file for his cake. It's blank. No hire date. No manager. No salary.", "secret": "Dale's personnel file is blank. No hire date, no manager, no salary."},
-			{"line": "Spare HR badge: lets you redraw your hand once in the boardroom. And fling him spinning: style counts double.", "reward": "item:hr_badge,item:style", "perk": "HR BADGE + STYLE: one redraw in the pitch, and flips score double"},
+			{"line": "Spare HR badge: lets you redraw your hand once in the boardroom. And bounce him spinning: style counts double.", "reward": "item:hr_badge,item:style", "perk": "HR BADGE + STYLE: one redraw in the pitch, and flips score double"},
 		],
 		"after": ["Spin him. Style counts.", "Writing the cake card. Need a rhyme for 'QA'.", "Reminder: the dummy is not Dale. Legally."],
 	},

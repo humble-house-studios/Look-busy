@@ -62,6 +62,8 @@ const NPC_SPOTS := {
 var office: Node
 var state: LadderState
 var crew: Coworkers
+## The arcade machines' missions (engine/arcade_missions.gd).
+var missions: ArcadeMissions
 
 var _rooms := {}
 var _doors := {}
@@ -86,6 +88,7 @@ func setup(o: Node) -> void:
 	office = o
 	state = LadderState.new()
 	crew = Coworkers.new()
+	missions = ArcadeMissions.new()
 
 
 # ---------------------------------------------------------------- materials
