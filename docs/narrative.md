@@ -52,20 +52,22 @@ shared save `user://office_relics.cfg`.
 - After: he's thinking about trying stand-up again. The seed for his own arc.
 
 ## The Ladder (built: scenes/office/ladder.gd)
-Dale's last chapter opens the office door. Each room is one rung up the
-studio, and each pays out what the next one spends:
+Dale's last chapter unlocks the office elevator. Each floor is one rung up
+the studio, reached by elevator (`scenes/office/lift.gd`: walk in, the doors
+shut, the floor counter ticks up, ding, the doors open on the next floor;
+walk back in to ride down), and each pays out what the next one spends:
 paycheck → tokens → tickets → portfolio → board votes → material.
 
 | Room | What you play | How you beat it |
 |---|---|---|
-| Arcade (the break room) | Glass-cage cabinets with real physics: Claw King, Push Your Luck (coin pusher), Fall Guy (bounce the Dale dummy up a glass column), prize counter | Buy the DOOR KEY (300 tickets) |
-| Archive (basement, secret) | Shelved games with notes about the founder | Ray's key opens it; finding it counts for the true ending |
+| Arcade (the break room) | Glass-cage cabinets with real physics: Claw King, Push Your Luck (coin pusher), Fall Guy (bounce the Dale dummy up a glass column), prize counter | Buy the ELEVATOR KEY (300 tickets) |
+| Archive (basement, secret) | Shelved games with notes about the founder | Ray's key sends the elevator by the claw down to it; finding it counts for the true ending |
 | Trading floor | Five stocks from your world on a 90s ticker; RUMORS come before NEWS | Double your cashed-out tickets by day 8 |
 | Boardroom | Dale is waiting: he's the founder (the reveal). Then answer each board member's objection with a matching card (YES, AND is wild) | Hear Dale out, then 3 yeses of 5 |
-| Corner office | Dale's memo; a putting toy; the fabled smoothie machine; the TOP FLOOR door (locked: the final room, not built yet) | Read the memo |
+| Corner office | Dale's memo; a putting toy; the fabled smoothie machine; the TOP FLOOR elevator (locked: the final room, not built yet) | Read the memo |
 | The stage (The Brick Wall), hidden | Behind a bookcase in the corner office; opens once you've found the archive and Ray told you the building was a club. An empty club and one more set, for fun | An extra, no finale |
 
-Rules: `engine/ladder_state.gd` (currencies, doors, to-do), `engine/arcade_rules.gd`,
+Rules: `engine/ladder_state.gd` (currencies, which floors are unlocked, to-do), `engine/arcade_rules.gd`,
 `engine/market.gd`, `engine/pitch.gd`, `engine/final_set.gd`. Screens:
 `scenes/ladder/` (each a machine in its own SubViewport on a 3D screen).
 
@@ -108,7 +110,7 @@ the QA desk by the window. **He tells you himself, partway up**: he's waiting
 in the boardroom once you've doubled your money on the trading floor
 (`dale_board`, `LadderState` milestone `reveal`; the voice chat keeps it secret
 until then via `DaleLines.FOUNDER`). His memo in the corner office points at
-the last door: the TOP FLOOR, locked. That's the final room (make your own
+the last elevator: the TOP FLOOR, locked. That's the final room (make your own
 game, then go outside), not built yet.
 
 The comedy club is a hidden extra for players who dig: find the basement and

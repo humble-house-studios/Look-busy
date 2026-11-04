@@ -1,20 +1,24 @@
 extends Node
 ## The ladder: the rooms past the office door, built into the office's own 3D
 ## world so walking, sitting at screens, touch, mouse and the controller all
-## work the same. Dale's last chapter opens the office door. Then:
+## work the same. Every floor is reached by ELEVATOR (scenes/office/lift.gd):
+## a car set into the wall between two floors; walk in, the doors shut, the
+## floors tick up, ding, the doors open onto the next floor. Each one is
+## locked until its floor is earned (LadderState.door_open, by the same ids
+## the old doors had). Dale's last chapter unlocks the office elevator. Then:
 ##   ARCADE (z 4-12): claw machine, coin pusher, the FALL GUY ragdoll cabinet
 ##     and the prize counter; five coworkers on break to talk to (Gloria,
 ##     Kev, Bernie, Theo and, once two machines are beaten, Ray). Tokens in,
-##     tickets out; the DOOR KEY opens the next door. Ray's key opens the
-##     basement ARCHIVE off the west wall.
+##     tickets out; the ELEVATOR KEY unlocks the next floor. Ray's key sends
+##     the elevator by the claw down to the basement ARCHIVE.
 ##   TRADING FLOOR (z 12-20): your tickets cash out as a portfolio; double it.
-##   BOARDROOM (z 20-26): pitch the board, three yeses of five.
-##   BOARDROOM: Dale is waiting at the end of the table. He's the founder
+##   BOARDROOM (z 20-26): Dale is waiting at the end of the table. He's the founder
 ##     (the reveal, partway up). Then pitch the board, three yeses of five.
 ##   CORNER OFFICE (z 26-32): Dale's memo on the desk, a 3D mini-golf toy, and
-##     the TOP FLOOR door in the west wall: the final room, locked (not built).
+##     the TOP FLOOR elevator in the west wall: the final room, locked (not built).
 ##   THE STAGE (z 32-40): a hidden extra. The building was a comedy club, The
-##     Brick Wall; a bookcase in the corner office hides the way in and only
+##     Brick Wall; a bookcase in the corner office (the one real door left)
+##     hides the way in and only
 ##     moves once you've found the basement and Ray told you about the club.
 ##     An empty, dusty club; one more set if you like. No finale.
 ## Each screen is a machine scene (scenes/ladder/) in its own SubViewport,
@@ -25,6 +29,7 @@ extends Node
 ## their machines paused. Rules: engine/ladder_state.gd, engine/coworkers.gd.
 ## Design: docs/narrative.md (The Ladder).
 
+const Lift := preload("res://scenes/office/lift.gd")
 const MACHINE_PX := Vector2i(720, 1280)
 const DOOR_W := 1.0
 const DOOR_H := 2.1
@@ -33,6 +38,20 @@ const ROOM_Z := {"office": -3.0, "arcade": 4.1, "trading": 12.2, "boardroom": 20
 const ROOM_END := 40.5
 const ORDER := ["office", "arcade", "trading", "boardroom", "corner", "stage"]
 const ARCHIVE := Rect2(-8.6, 5.6, 5.0, 3.8)
+## The elevators, by the id of the floor they unlock (LadderState.door_open):
+## [centre on the wall line, yaw (local +z points to the upper side), the
+## floor below / the floor above ("" = nothing up there yet)].
+const LIFTS := {
+	"office": [Vector3(1.8, 0, 4.1), 0.0, "office", "arcade"],
+	"trading": [Vector3(0, 0, 12.2), 0.0, "arcade", "trading"],
+	"archive": [Vector3(-3.55, 0, 7.4), -PI / 2, "arcade", "archive"],
+	"boardroom": [Vector3(0, 0, 20.3), 0.0, "trading", "boardroom"],
+	"corner": [Vector3(2.5, 0, 26.4), 0.0, "boardroom", "corner"],
+	"top": [Vector3(-3.55, 0, 30.8), -PI / 2, "corner", ""],
+}
+## The gap a lift sits in (wide, and taller than a door).
+const LIFT_W := Lift.OUT_W
+const LIFT_H := Lift.SHELL_H
 ## Where each coworker stands, and which way they face (toward the middle).
 const NPC_SPOTS := {
 	"gloria": [Vector3(-2.15, 0, 5.15), 0.65], "kev": [Vector3(2.15, 0, 5.9), -0.8],
@@ -46,6 +65,7 @@ var crew: Coworkers
 
 var _rooms := {}
 var _doors := {}
+var _lifts := {}
 var _machines := {}
 var _people := {}
 var _room := "office"
@@ -58,8 +78,6 @@ var _talk_id := ""
 var _time := 0.0
 var _locked_hint := ""
 var _doors_ready := false
-## Look Busy's boss is coming through the shut office door: show the arcade.
-var _peek := false
 ## What the office's goal marker is over: its "!" (if any) hides.
 var goal_id := ""
 
@@ -103,7 +121,7 @@ func _light(room: String) -> Dictionary:
 				"col": [Vector3(0.9, 0.3, 0.6), Vector3(0.25, 0.8, 0.75), Vector3(0.9, 0.5, 0.2), Vector3(0.9, 0.75, 0.3), Vector3(0.45, 0.4, 0.6), Vector3(0.4, 0.3, 0.7)]}
 		"archive":
 			L = {"amb": Vector3(0.2, 0.22, 0.28), "fog": Vector3(0.05, 0.05, 0.07), "range": 4.0, "pos": [
-				Vector3(-6.2, 2.2, 7.4), Vector3(-4.2, 1.2, 7.4), Vector3(-8, 1, 6), Vector3.ZERO, Vector3.ZERO, Vector3.ZERO],
+				Vector3(-6.2, 2.2, 7.4), Vector3(-5.2, 1.2, 7.4), Vector3(-8, 1, 6), Vector3.ZERO, Vector3.ZERO, Vector3.ZERO],
 				"col": [Vector3(0.9, 0.75, 0.45), Vector3(0.3, 0.3, 0.4), Vector3(0.2, 0.25, 0.35), Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]}
 		"trading":
 			L = {"amb": Vector3(0.42, 0.48, 0.44), "fog": Vector3(0.25, 0.32, 0.27), "range": 5.0, "pos": [
@@ -162,50 +180,53 @@ func build() -> void:
 	arch.name = "archive"
 	office._world_vp.add_child(arch)
 	_rooms["archive"] = arch
-	_office_door()
 	_build_arcade()
 	_build_archive()
 	_build_trading()
 	_build_boardroom()
 	_build_corner()
 	_build_stage()
+	_build_lifts()
 	_refresh_people()
 	_update_rooms(true)
 
 
 ## Walls, floor and ceiling of one room spanning z0..z1 (x -3.5..3.5), with
 ## the door gap in its far wall at door_x (none for the last room).
-func _shell(room: String, z0: float, z1: float, h: float, wall: Material, floor_mat: Material, ceil_mat: Material, door_x: float, front_door_x: float, west_door_z := -99.0) -> void:
+## Gaps are an elevator's (wide); far_door / front_door: a plain door's.
+func _shell(room: String, z0: float, z1: float, h: float, wall: Material, floor_mat: Material, ceil_mat: Material, door_x: float, front_door_x: float, west_door_z := -99.0, far_door := false, front_door := false) -> void:
 	var p: Node3D = _rooms[room]
 	var depth := z1 - z0
 	var cz := (z0 + z1) * 0.5
 	# This room's face of the wall you came through (the far side belongs to
 	# the room before), with the same door gap.
-	_wall_with_door(p, z0 + 0.05, h, front_door_x, wall)
+	_wall_with_door(p, z0 + 0.05, h, front_door_x, wall, front_door)
 	_box(Vector3(7.2, 0.1, depth + 0.1), Vector3(0, -0.05, cz), floor_mat, true, Vector3.ZERO, p)
 	_box(Vector3(7.2, 0.1, depth + 0.1), Vector3(0, h + 0.05, cz), ceil_mat, true, Vector3.ZERO, p)
 	# East wall, and the west wall (split around a side door if there is one).
 	_box(Vector3(0.1, h, depth), Vector3(3.55, h * 0.5, cz), wall, true, Vector3.ZERO, p)
 	if west_door_z > -90.0:
-		var a := west_door_z - DOOR_W * 0.5
-		var b := west_door_z + DOOR_W * 0.5
+		var a := west_door_z - LIFT_W * 0.5
+		var b := west_door_z + LIFT_W * 0.5
 		_box(Vector3(0.1, h, a - z0), Vector3(-3.55, h * 0.5, (z0 + a) * 0.5), wall, true, Vector3.ZERO, p)
 		_box(Vector3(0.1, h, z1 - b), Vector3(-3.55, h * 0.5, (b + z1) * 0.5), wall, true, Vector3.ZERO, p)
-		_box(Vector3(0.1, h - DOOR_H, DOOR_W), Vector3(-3.55, DOOR_H + (h - DOOR_H) * 0.5, west_door_z), wall, true, Vector3.ZERO, p)
+		_box(Vector3(0.1, h - LIFT_H, LIFT_W), Vector3(-3.55, LIFT_H + (h - LIFT_H) * 0.5, west_door_z), wall, true, Vector3.ZERO, p)
 	else:
 		_box(Vector3(0.1, h, depth), Vector3(-3.55, h * 0.5, cz), wall, true, Vector3.ZERO, p)
 	if door_x > -90.0:
-		_wall_with_door(p, z1 + 0.05, h, door_x, wall)
+		_wall_with_door(p, z1 + 0.05, h, door_x, wall, far_door)
 	else:
 		_box(Vector3(7.2, h, 0.1), Vector3(0, h * 0.5, z1 + 0.05), wall, true, Vector3.ZERO, p)
 
 
-func _wall_with_door(p: Node3D, z: float, h: float, door_x: float, wall: Material) -> void:
-	var a := door_x - DOOR_W * 0.5
-	var b := door_x + DOOR_W * 0.5
+func _wall_with_door(p: Node3D, z: float, h: float, door_x: float, wall: Material, door := false) -> void:
+	var w := DOOR_W if door else LIFT_W
+	var gh := DOOR_H if door else LIFT_H
+	var a := door_x - w * 0.5
+	var b := door_x + w * 0.5
 	_box(Vector3(a + 3.6, h, 0.1), Vector3((-3.6 + a) * 0.5, h * 0.5, z), wall, true, Vector3.ZERO, p)
 	_box(Vector3(3.6 - b, h, 0.1), Vector3((b + 3.6) * 0.5, h * 0.5, z), wall, true, Vector3.ZERO, p)
-	_box(Vector3(DOOR_W, h - DOOR_H, 0.1), Vector3(door_x, DOOR_H + (h - DOOR_H) * 0.5, z), wall, true, Vector3.ZERO, p)
+	_box(Vector3(w, h - gh, 0.1), Vector3(door_x, gh + (h - gh) * 0.5, z), wall, true, Vector3.ZERO, p)
 
 
 ## A door in a gap: a hinged panel that swings open once it's unlocked.
@@ -231,8 +252,33 @@ func _door(id: String, room: String, center: Vector3, along_x: bool, color: Colo
 	_doors[id] = {"hinge": hinge, "panel": panel, "open": false, "center": center, "locks": [lock, lock_back], "along_x": along_x}
 
 
-func _office_door() -> void:
-	_door("office", "office", Vector3(1.8, 0, 4.05), true, Color(0.6, 0.42, 0.26), "")
+## Every floor's elevator (LIFTS), parented to the world so a car shows from
+## both floors it joins.
+func _build_lifts() -> void:
+	for id in LIFTS:
+		var spec: Array = LIFTS[id]
+		var l := Lift.new()
+		l.name = "lift_" + id
+		l.position = spec[0]
+		l.rotation.y = spec[1]
+		office._world_vp.add_child(l)
+		l.build(self, id, spec[2], spec[3])
+		_lifts[id] = l
+
+
+## The elevator you're standing in, or null.
+func lift_at(p: Vector3):
+	for id in _lifts:
+		if _lifts[id].inside(p):
+			return _lifts[id]
+	return null
+
+
+## Look Busy: the boss rides the office elevator down; hold its doors open
+## while they walk out (and back in), with a ding unless they're silent.
+func lift_hold(id: String, on: bool, ding := true) -> void:
+	if _lifts.has(id):
+		_lifts[id].set_hold(on, ding)
 
 
 func _cabinet(room: String, at: Vector3, rot_y: float, body_col: Color, title: String, title_col: Color, machine: String, script: String) -> void:
@@ -532,8 +578,8 @@ func _build_arcade() -> void:
 	# Neon strips and signs.
 	for spec in [[Vector3(-3.48, 2.5, 8.0), Color(1.0, 0.3, 0.7)], [Vector3(3.48, 2.5, 8.0), Color(0.3, 0.95, 0.9)]]:
 		_box(Vector3(0.03, 0.05, 7.6), spec[0], _glow(r, spec[1]), false, Vector3.ZERO, p)
-	_label("THE BREAK ROOM ARCADE", Vector3(0, 2.45, ROOM_Z.trading - 0.17), 26, Color(1.0, 0.45, 0.8), p, Vector3(0, PI, 0))
-	_label("WIN TICKETS -> PRIZE COUNTER -> DOOR KEY", Vector3(0, 2.6, z0 + 0.12), 14, Color(0.4, 1.0, 0.9), p)
+	_label("THE BREAK ROOM ARCADE", Vector3(0, 2.66, ROOM_Z.trading - 0.17), 26, Color(1.0, 0.45, 0.8), p, Vector3(0, PI, 0))
+	_label("WIN TICKETS -> PRIZE COUNTER -> ELEVATOR KEY", Vector3(-0.5, 2.64, z0 + 0.12), 14, Color(0.4, 1.0, 0.9), p)
 	_cabinet(r, Vector3(-2.95, 0, 6.0), PI / 2, Color(0.45, 0.1, 0.35), "CLAW\nKING", Color(1.0, 0.45, 0.8), "claw", "res://scenes/ladder/claw.gd")
 	_cabinet(r, Vector3(-2.95, 0, 9.0), PI / 2, Color(0.5, 0.25, 0.08), "FALL\nGUY", Color(1.0, 0.65, 0.3), "ragdoll", "res://scenes/ladder/ragdoll.gd")
 	_cabinet(r, Vector3(2.95, 0, 7.2), -PI / 2, Color(0.06, 0.35, 0.35), "PUSH YOUR\nLUCK", Color(0.4, 1.0, 0.9), "pusher", "res://scenes/ladder/pusher.gd")
@@ -552,7 +598,7 @@ func _build_arcade() -> void:
 		for i in 6:
 			office._ball(0.07, Vector3(-0.6 + i * 0.24, 1.38 + row * 0.38, -0.42), _mat(r, prize_cols[(i + row) % 4]), counter)
 	_box(Vector3(0.1, 0.7, 0.04), Vector3(-0.45, 1.65, -0.39), _mat(r, Color(0.85, 0.75, 0.4), 0, Color.BLACK, 24.0, Color(0.4, 0.3, 0.1)), false, Vector3(0, 0, 0.3), counter)
-	_label("DOOR\nKEY\n300", Vector3(-0.45, 2.15, -0.38), 9, Color(1.0, 0.9, 0.5), counter)
+	_label("LIFT\nKEY\n300", Vector3(-0.45, 2.15, -0.38), 9, Color(1.0, 0.9, 0.5), counter)
 	_label("PRIZES", Vector3(0, 2.45, -0.4), 22, Color(1.0, 0.8, 0.3), counter)
 	_monitor(r, counter, Vector3(0.45, 1.0, 0.05), Vector2(0.27, 0.48), "counter", "res://scenes/ladder/counter.gd", Color(0.3, 0.22, 0.12))
 	# Out-of-order cabinets along the back wall, for atmosphere.
@@ -573,8 +619,6 @@ func _build_arcade() -> void:
 		var spot: Array = NPC_SPOTS[id]
 		_person(r, id, spot[0], spot[1], LOOKS[id])
 	# Doors: to the trading floor (centre of the back wall) and the archive.
-	_door("trading", "arcade", Vector3(0, 0, ROOM_Z.trading - 0.05), true, Color(0.25, 0.25, 0.28), "TRADING FLOOR")
-	_door("archive", "arcade", Vector3(-3.55, 0, 7.4), false, Color(0.3, 0.28, 0.25), "BASEMENT")
 
 
 ## A CRT-style monitor in a rig, screen facing local +z, running a machine.
@@ -649,8 +693,8 @@ func _build_trading() -> void:
 		for zz in [z0 + 2.0, z0 + 6.0]:
 			_box(Vector3(0.5, 0.03, 1.4), Vector3(x, 2.98, zz), panel, false, Vector3.ZERO, p)
 	# The big ticker board over the far door.
-	_box(Vector3(6.2, 0.5, 0.06), Vector3(0, 2.6, z1 - 0.04), _mat(r, Color(0.02, 0.02, 0.02)), false, Vector3.ZERO, p)
-	_ticker = _label("", Vector3(0, 2.6, z1 - 0.08), 26, Color(1.0, 0.7, 0.2), p, Vector3(0, PI, 0))
+	_box(Vector3(6.2, 0.44, 0.06), Vector3(0, 2.74, z1 - 0.04), _mat(r, Color(0.02, 0.02, 0.02)), false, Vector3.ZERO, p)
+	_ticker = _label("", Vector3(0, 2.74, z1 - 0.08), 26, Color(1.0, 0.7, 0.2), p, Vector3(0, PI, 0))
 	_label("BUY LOW  SELL HIGH  DOUBLE IT", Vector3(0, 2.6, z0 + 0.08), 18, Color(0.4, 1.0, 0.5), p)
 	# Rows of trader desks with glowing green CRTs.
 	var desk := _mat(r, Color(0.3, 0.32, 0.36))
@@ -672,7 +716,6 @@ func _build_trading() -> void:
 	_box(Vector3(1.06, 0.7, 0.04), Vector3(0, 0.37, 0.33), desk, true, Vector3.ZERO, term)
 	_monitor(r, term, Vector3(0, 0.77, 0.12), Vector2(0.4, 0.71), "trading", "res://scenes/ladder/trading.gd", Color(0.2, 0.22, 0.24))
 	_label("TERMINAL 1", Vector3(0, 1.75, 0.0), 12, Color(0.4, 1.0, 0.5), term)
-	_door("boardroom", "trading", Vector3(0, 0, z1 + 0.05), true, Color(0.35, 0.25, 0.18), "BOARDROOM")
 
 
 func _build_boardroom() -> void:
@@ -715,8 +758,7 @@ func _build_boardroom() -> void:
 	_cyl(0.07, 0.24, Vector3(-0.6, 0.92, z0 + 1.7), _mat(r, Color(0.6, 0.75, 0.9), 0, Color.BLACK, 24.0, Color(0.05, 0.08, 0.12)), p)
 	_label("SYNERGY", Vector3(3.48, 1.7, z0 + 3.0), 18, Color(0.9, 0.85, 0.7), p, Vector3(0, -PI / 2, 0))
 	# Dale, waiting for you: fifteen years and he finally came up the ladder.
-	_person(r, "dale_board", Vector3(1.3, 0, z0 + 1.9), -PI * 0.81, LOOKS.dale)
-	_door("corner", "boardroom", Vector3(2.5, 0, z1 + 0.05), true, Color(0.5, 0.35, 0.2), "CORNER OFFICE")
+	_person(r, "dale_board", Vector3(1.5, 0, z0 + 2.6), -PI * 0.81, LOOKS.dale)
 
 
 func _build_corner() -> void:
@@ -727,7 +769,7 @@ func _build_corner() -> void:
 	var wall := _mat(r, Color(0.8, 0.74, 0.62), 6, Color.BLACK, 20.0)
 	var carpet := _mat(r, Color(0.55, 0.45, 0.32), 1, Color(0.5, 0.4, 0.28), 26.0)
 	var ceil := _mat(r, Color(0.9, 0.88, 0.82), 2, Color(0.6, 0.58, 0.52), 30.0)
-	_shell(r, z0, z1, 3.0, wall, carpet, ceil, 2.5, 2.5, z0 + 4.4)
+	_shell(r, z0, z1, 3.0, wall, carpet, ceil, 2.5, 2.5, z0 + 4.4, true)
 	# A wall of window: the city at sunset.
 	_box(Vector3(0.04, 2.0, 5.0), Vector3(3.48, 1.5, z0 + 3.0), _glow(r, Color(1.0, 0.6, 0.35)), false, Vector3.ZERO, p)
 	for i in 6:
@@ -767,9 +809,8 @@ func _build_corner() -> void:
 	_box(Vector3(0.02, 0.4, 0.3), Vector3(-2.89, 1.15, z0 + 1.2), _glow(r, Color(1.0, 0.6, 0.75)), false, Vector3.ZERO, p)
 	_label("SMOOTHIES", Vector3(-2.88, 1.62, z0 + 1.2), 12, Color(1.0, 0.95, 0.9), p, Vector3(0, PI / 2, 0))
 	_label("YOU MADE IT.", Vector3(0, 2.5, z0 + 0.08), 22, Color(0.5, 0.3, 0.15), p)
-	# The final room: up a floor, through a door nobody has a key to. Yet.
-	_door("top", "corner", Vector3(-3.55, 0, z0 + 4.4), false, Color(0.75, 0.62, 0.3), "TOP FLOOR")
-	_label("^ STAIRS ^", Vector3(-3.48, 2.55, z0 + 4.4), 10, Color(0.6, 0.45, 0.25), p, Vector3(0, PI / 2, 0))
+	# The final room: the TOP FLOOR elevator in the west wall (LIFTS), and
+	# nobody has the key. Yet.
 	# The way to the old club stage: a door hidden behind a bookcase.
 	_door("stage", "corner", Vector3(2.5, 0, z1 + 0.05), true, Color(0.3, 0.18, 0.1), "")
 	_bookcase(_doors.stage)
@@ -801,7 +842,7 @@ func _build_stage() -> void:
 	var brick := _mat(r, Color(0.45, 0.2, 0.15), 5, Color(0.38, 0.16, 0.12), 6.0)
 	var floor_mat := _mat(r, Color(0.12, 0.1, 0.1), 5, Color(0.1, 0.08, 0.08), 12.0)
 	var ceil := _mat(r, Color(0.05, 0.04, 0.05))
-	_shell(r, z0, z1, 3.2, brick, floor_mat, ceil, -99.0, 2.5)
+	_shell(r, z0, z1, 3.2, brick, floor_mat, ceil, -99.0, 2.5, -99.0, false, true)
 	_label("THE BRICK WALL", Vector3(0, 2.6, z1 - 0.08), 34, Color(1.0, 0.3, 0.55), p, Vector3(0, PI, 0))
 	_label("COMEDY CLUB  EST. 1987", Vector3(0, 2.35, z1 - 0.08), 14, Color(1.0, 0.8, 0.4), p, Vector3(0, PI, 0))
 	_label("CLOSED SINCE 2011", Vector3(-3.48, 2.0, z0 + 2.0), 16, Color(0.4, 0.9, 1.0), p, Vector3(0, PI / 2, 0))
@@ -955,7 +996,7 @@ func end_talk(id: String, finished := true) -> void:
 		"memo":
 			if finished and not state.is_done("memo"):
 				state.mark("memo")
-				_toast("THE TOP FLOOR: WEST WALL, UP THE STAIRS.\nLOCKED. NOT YET.")
+				_toast("THE TOP FLOOR: THE ELEVATOR IN THE WEST WALL.\nLOCKED. NOT YET.")
 		"dale_board":
 			if finished and not state.is_done("reveal"):
 				state.mark("reveal")
@@ -1030,13 +1071,13 @@ func buy(id: String) -> bool:
 func market_won() -> void:
 	state.mark("market")
 	_update_doors(false)
-	_toast("YOU DOUBLED IT. THE BOARDROOM DOOR IS OPEN")
+	_toast("YOU DOUBLED IT.\nTHE ELEVATOR GOES UP TO THE BOARDROOM NOW")
 
 
 func pitch_won() -> void:
 	state.mark("pitch")
 	_update_doors(false)
-	_toast("GREENLIT. THE CORNER OFFICE IS OPEN")
+	_toast("GREENLIT.\nTHE ELEVATOR GOES UP TO THE CORNER OFFICE NOW")
 
 
 func stage_won() -> void:
@@ -1068,8 +1109,15 @@ func refresh_alerts() -> void:
 
 
 ## Where the office's goal marker floats for key (engine/goal_target.gd), or
-## null. Doors: in the doorway, on your side of it.
+## null. Doors ("door_" + a floor's id): in front of that floor's elevator,
+## on your side of it (inside it: in the car); the bookcase: in its doorway.
 func goal_spot(key: String, me: Vector3):
+	if key.begins_with("door_") and _lifts.has(key.substr(5)):
+		var l: Node3D = _lifts[key.substr(5)]
+		if l.inside(me):
+			return l.to_global(Vector3(0, 1.85, 0))
+		var s := 1.0 if l.to_local(me).z > 0.0 and l.two_sided() else -1.0
+		return l.to_global(Vector3(0, 1.75, s * (Lift.HALF + 0.3)))
 	if key.begins_with("door_"):
 		var d: Dictionary = _doors.get(key.substr(5), {})
 		if d.is_empty():
@@ -1101,6 +1149,7 @@ func hint() -> String:
 func tick(delta: float) -> void:
 	_time += delta
 	var me: Vector3 = office._player.global_position
+	_tick_lifts(delta, me)
 	var room := _room_at(me)
 	if room != _room:
 		_room = room
@@ -1123,8 +1172,15 @@ func tick(delta: float) -> void:
 			m.node.set_active(on)
 	_tick_people(delta, me)
 	_tick_ticker(delta)
-	# Standing at a locked door? Say what opens it.
+	# Standing at a locked door or elevator? Say what opens it.
 	_locked_hint = ""
+	for id in _lifts:
+		var l: Node3D = _lifts[id]
+		if l.gate:
+			continue
+		var lp: Vector3 = l.to_local(me)
+		if absf(lp.x) < 1.4 and absf(lp.z) < Lift.HALF + 1.4:
+			_locked_hint = _lock_text(id)
 	for id in _doors:
 		var d: Dictionary = _doors[id]
 		if d.open:
@@ -1136,15 +1192,15 @@ func tick(delta: float) -> void:
 
 # ---------------------------------------------------------------- dev tools
 
-## Where the DEV panel's teleports land: just inside each room's door, facing
-## in (the same clear spots tools/ladder_walk.gd walks through).
+## Where the DEV panel's teleports land: just out of each floor's elevator,
+## facing in (the same clear spots tools/ladder_walk.gd walks through).
 const SPOTS := {
 	"office": {"name": "OFFICE", "pos": Vector3(0.3, 0, 3.2), "yaw": 0.0},
-	"arcade": {"name": "ARCADE", "pos": Vector3(1.8, 0, 5.0), "yaw": PI},
+	"arcade": {"name": "ARCADE", "pos": Vector3(1.8, 0, 5.4), "yaw": PI},
 	"archive": {"name": "BASEMENT", "pos": Vector3(-5.0, 0, 7.4), "yaw": PI / 2},
-	"trading": {"name": "TRADING FLOOR", "pos": Vector3(0, 0, 13.2), "yaw": PI},
-	"boardroom": {"name": "BOARDROOM", "pos": Vector3(0, 0, 21.2), "yaw": PI},
-	"corner": {"name": "CORNER OFFICE", "pos": Vector3(2.5, 0, 27.4), "yaw": PI},
+	"trading": {"name": "TRADING FLOOR", "pos": Vector3(0, 0, 13.5), "yaw": PI},
+	"boardroom": {"name": "BOARDROOM", "pos": Vector3(0, 0, 21.6), "yaw": PI},
+	"corner": {"name": "CORNER OFFICE", "pos": Vector3(2.5, 0, 27.7), "yaw": PI},
 	"stage": {"name": "THE STAGE", "pos": Vector3(2.5, 0, 33.4), "yaw": PI},
 }
 
@@ -1168,6 +1224,13 @@ func dev_teleport(room: String) -> void:
 	if office._talking:
 		office._set_talk(false)
 	office._set_seat(null)
+	# The elevators wait on the floor you land on.
+	for id in _lifts:
+		var l: Node3D = _lifts[id]
+		for s in [-1, 1]:
+			if l.rooms[s] == room and l.phase == "idle":
+				l.at = s
+				l.snap()
 	office._player.global_position = spot.pos
 	office._player.velocity = Vector3.ZERO
 	office._yaw = spot.yaw
@@ -1178,15 +1241,15 @@ func dev_teleport(room: String) -> void:
 func _lock_text(id: String) -> String:
 	match id:
 		"office":
-			return "LOCKED. DALE HAS THE KEY.\n(FINISH HIS STORY)"
+			return "ELEVATOR LOCKED. DALE HAS THE KEY.\n(FINISH HIS STORY)"
 		"trading":
-			return "LOCKED. BUY THE DOOR KEY\nAT THE PRIZE COUNTER (300 TICKETS)"
+			return "ELEVATOR LOCKED. BUY THE ELEVATOR KEY\nAT THE PRIZE COUNTER (300 TICKETS)"
 		"archive":
-			return "BASEMENT. LOCKED.\nTHE JANITOR HAS A KEY."
+			return "BASEMENT. NEEDS A KEY.\nTHE JANITOR HAS ONE."
 		"boardroom":
-			return "LOCKED. DOUBLE YOUR MONEY\nON THE TERMINAL FIRST."
+			return "ELEVATOR LOCKED. DOUBLE YOUR MONEY\nON THE TERMINAL FIRST."
 		"corner":
-			return "LOCKED. WIN THE PITCH FIRST."
+			return "ELEVATOR LOCKED. WIN THE PITCH FIRST."
 		"stage":
 			return "A BOOKCASE. DUSTY.\nSOMETHING'S DRAFTY BEHIND IT."
 		"top":
@@ -1195,6 +1258,10 @@ func _lock_text(id: String) -> String:
 
 
 func _room_at(p: Vector3) -> String:
+	# In an elevator: the floor it's at.
+	var l = lift_at(p)
+	if l:
+		return l.room()
 	if p.x < -3.6 and p.z > ARCHIVE.position.y - 0.5 and p.z < ARCHIVE.end.y + 0.5:
 		return "archive"
 	var room := "office"
@@ -1226,17 +1293,14 @@ func _entered(room: String) -> void:
 			_toast("THE BRICK WALL. CLOSED SINCE 2011.\nTHIS WAS A COMEDY CLUB. BIG DEAL PLAYED HERE.")
 
 
-## Show the room you're in and its neighbours (seen through open doors);
-## pause the machines everywhere else.
+## Show the floor you're on (elevator doors never open onto two floors at
+## once, so that's all you can see; the bookcase is the one real door and
+## shows the room behind it once it's open); pause the machines elsewhere.
 func _update_rooms(force: bool) -> void:
-	var i := ORDER.find(_room if _room != "archive" else "arcade")
-	var show := {}
-	for k in range(maxi(0, i - 1), mini(ORDER.size(), i + 2)):
-		show[ORDER[k]] = true
-	show["archive"] = _room in ["arcade", "archive"]
-	# Nothing to see behind a shut office door (saves drawing the arcade).
-	if _room == "office" and not _doors.get("office", {}).get("open", false) and not _peek:
-		show["arcade"] = false
+	var show := {_room: true}
+	if _room in ["corner", "stage"] and _doors.get("stage", {}).get("open", false):
+		show["corner"] = true
+		show["stage"] = true
 	for r in _rooms:
 		var on: bool = show.get(r, false)
 		if force or _visible_rooms.get(r, null) != on:
@@ -1244,7 +1308,7 @@ func _update_rooms(force: bool) -> void:
 			_visible_rooms[r] = on
 	for id in _machines:
 		var m: Dictionary = _machines[id]
-		var here: bool = m.room == _room or (m.room == "archive" and _room == "arcade") or (m.room == "arcade" and _room == "archive")
+		var here: bool = m.room == _room
 		m.vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if here else (SubViewport.UPDATE_ONCE if force else SubViewport.UPDATE_DISABLED)
 		m.node.process_mode = Node.PROCESS_MODE_INHERIT if here else Node.PROCESS_MODE_DISABLED
 		# A cage's physics stops with it (its bodies leave the physics space).
@@ -1252,23 +1316,36 @@ func _update_rooms(force: bool) -> void:
 			m.cage.process_mode = m.node.process_mode
 
 
-## Look Busy: the boss walks in through the office door even while it's
-## locked to you, so the arcade behind it shows for the moment it's open.
-func peek_arcade(on: bool) -> void:
-	if on != _peek:
-		_peek = on
-		_update_rooms(false)
+## Run the elevators on (or riding to) your floor; rock the camera a little
+## while yours moves, and catch the floors up the moment it arrives.
+func _tick_lifts(delta: float, me: Vector3) -> void:
+	var sway := 0.0
+	for id in _lifts:
+		var l: Node3D = _lifts[id]
+		if l.rooms[-1] != _room and l.rooms[1] != _room and not l.hold and l.phase == "idle":
+			continue
+		l.tick(delta, me)
+		if l.inside(me):
+			sway = l.sway()
+	office._camera.v_offset = sway
 
 
 func _update_doors(instant: bool) -> void:
 	var office_done: bool = office._dale_story.next_chapter().is_empty()
+	for id in _lifts:
+		var l: Node3D = _lifts[id]
+		var on := state.door_open(id, office_done, crew.secrets.has("ray"))
+		if on != l.gate or instant:
+			var news: bool = on and not l.gate and not instant
+			l.set_gate(on)
+			if news:
+				_toast_door(id)
 	for id in _doors:
 		var d: Dictionary = _doors[id]
 		var want := state.door_open(id, office_done, crew.secrets.has("ray"))
 		if want and not d.open:
 			d.open = true
-			if id == "office":
-				_update_rooms(true)
+			_update_rooms(true)
 			for l in d.locks:
 				l.visible = false
 			var body := d.panel.get_child(0) as StaticBody3D
@@ -1281,13 +1358,12 @@ func _update_doors(instant: bool) -> void:
 			else:
 				var t := create_tween()
 				t.tween_property(d.hinge, "rotation:y", angle, 0.9).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-				if id != "office":
-					_toast_door(id)
+				_toast_door(id)
 
 
 func _toast_door(id: String) -> void:
 	if id == "archive":
-		_toast("THE BASEMENT DOOR IS UNLOCKED (BY THE CLAW)")
+		_toast("RAY'S KEY: THE ELEVATOR BY THE CLAW\nGOES DOWN TO THE BASEMENT NOW")
 	elif id == "stage":
 		_toast("...THE BOOKCASE IN THE CORNER OFFICE CREAKED OPEN.")
 

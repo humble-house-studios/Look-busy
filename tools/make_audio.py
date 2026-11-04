@@ -431,12 +431,51 @@ def make_look_busy():
     write_wav("bell", bell, 0.55)
 
 
+def make_lift():
+    """The ladder's elevators: the arrival chime, the motor hum of a ride and
+    the doors sliding. Own random generator, after everything else, so every
+    sound above stays byte-for-byte the same."""
+    rng = np.random.default_rng(91)
+
+    def burst(dur):
+        return rng.uniform(-1, 1, int(SR * dur))
+
+    # Arrival chime: a soft two-note bell, high then low (ding-dong).
+    def strike(f0, dur):
+        t = t_axis(dur)
+        return sum(np.sin(2 * np.pi * f0 * k * t) * a for k, a in ((1, 1.0), (2.0, 0.3), (3.0, 0.12))) * decay(dur, 0.35, 0.003)
+    chime = np.zeros(int(SR * 1.3))
+    place(chime, strike(note(81), 0.9), 0.0)
+    place(chime, strike(note(77), 1.0), 0.32, 0.9)
+    write_wav("lift_ding", chime, 0.5)
+
+    # The ride: a low motor hum that spins up, holds and settles (2.4 s; the
+    # game stops it early on short rides).
+    dur = 2.4
+    t = t_axis(dur)
+    env = np.clip(t / 0.35, 0, 1) * np.clip((dur - t) / 0.5, 0, 1)
+    f = 58 + 6 * np.clip(t / 0.4, 0, 1)
+    hum = harmonics(f, 6, 1.4) * 0.8
+    hum += shape(burst(dur), [(180, 120, 1.0), (520, 200, 0.3)], 0.0) * 0.5
+    hum *= 1 + 0.08 * np.sin(2 * np.pi * 7 * t)
+    write_wav("lift_hum", hum * env, 0.45)
+
+    # Doors: a short rumbling slide with a soft bump at the end.
+    dur = 0.6
+    t = t_axis(dur)
+    slide = shape(burst(dur), [(300, 200, 1.0), (900, 300, 0.25)], 0.0) * np.sin(np.linspace(0, np.pi, len(t))) ** 0.8
+    bump = np.zeros(len(t))
+    place(bump, np.sin(2 * np.pi * 70 * t_axis(0.12)) * decay(0.12, 0.03), 0.48)
+    write_wav("lift_doors", slide * 0.7 + bump, 0.4)
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     make_sfx()
     make_music()
     make_office()
     make_look_busy()
+    make_lift()
     for f in sorted(os.listdir(OUT)):
         if not f.endswith(".import"):
             print(f"{f:20s} {os.path.getsize(os.path.join(OUT, f)) // 1024} KB")

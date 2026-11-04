@@ -102,7 +102,7 @@ func test_progress_is_saved() -> void:
 
 func test_objective_walks_the_rooms() -> void:
 	var l := LadderState.new(LADDER)
-	assert_string_contains(l.objective(0), "DOOR")
+	assert_string_contains(l.objective(0), "ELEVATOR")
 	l.collect_paycheck({})
 	assert_string_contains(l.objective(0), "(0/300)")
 	l.items.append("door_key")

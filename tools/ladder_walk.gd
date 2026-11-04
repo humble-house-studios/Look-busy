@@ -1,13 +1,14 @@
 extends SceneTree
 ## Debug walkthrough of the ladder, headless or under xvfb. Starts fresh
 ## saves with Dale's story done, then:
-##  - walks (real physics) from the office through every door (Dale's reveal
-##    in the boardroom, the locked top floor, the bookcase to the hidden stage),
-##    unlocking each door the way the game does;
+##  - walks (real physics) from the office up every elevator (in, doors shut,
+##    the ride, doors open, out; Dale's reveal in the boardroom, the locked top
+##    floor, the bookcase to the hidden stage), unlocking each floor the way
+##    the game does;
 ##  - checks that every screen can be tapped from in front of it and that
 ##    every coworker can be tapped to talk;
 ##  - runs a talk to the end with each coworker, a gift and a callback;
-##  - checks locked doors block you and the to-do follows along.
+##  - checks locked elevators block you and the to-do follows along.
 ## Prints PASS / FAIL lines and a summary. Wipes user://dale.cfg,
 ## ladder.cfg and coworkers.cfg.
 ##   godot --headless -s res://tools/ladder_walk.gd
@@ -31,18 +32,20 @@ func _init() -> void:
 	for i in 10: await process_frame
 	office._touch = true
 	ladder = office._ladder
-	check(ladder.objective().contains("DOOR"), "to-do points at the door first")
+	check(ladder.objective().contains("ELEVATOR"), "to-do points at the elevator first")
 
-	# Office -> arcade, through the office door.
-	await walk(Vector3(1.8, 0, 2.6), 4.9)
-	check(ladder.room() == "arcade", "walked into the arcade")
+	# Office -> arcade, up the office elevator: the doors open as you walk up,
+	# shut behind you, and open onto the arcade after the ride.
+	await walk(Vector3(1.8, 0, 2.2), 5.3, 9.0)
+	check(ladder.room() == "arcade", "rode the elevator up to the arcade")
+	check(ladder._lifts.office.at == 1 and ladder._lifts.office.phase == "idle", "the car stays at the arcade")
 	check(ladder.state.paid and ladder.state.tokens > 0, "payday on entering (%d tokens)" % ladder.state.tokens)
 	check(ladder.objective().contains("TICKETS"), "to-do: win tickets")
 
-	# Locked trading door blocks you.
-	await walk(Vector3(0, 0, 10.6), 12.6, 2.0)
-	check(ladder.room() == "arcade", "locked door to the trading floor blocks you")
-	check(ladder.hint().contains("DOOR KEY"), "locked door says what opens it")
+	# The locked elevator up to the trading floor blocks you.
+	await walk(Vector3(0, 0, 10.4), 12.6, 2.5)
+	check(ladder.room() == "arcade" and office._player.global_position.z < 11.5, "the locked elevator to the trading floor stays shut")
+	check(ladder.hint().contains("ELEVATOR KEY"), "the locked elevator says what opens it")
 
 	# Every arcade screen is tappable from in front of it.
 	for id in ["claw", "ragdoll", "pusher", "counter"]:
@@ -80,18 +83,23 @@ func _init() -> void:
 		await talk_through("ray", "yes_and")
 	check(ladder.state.has("archive_key"), "Ray gave the archive key")
 	await frames(40)
-	await walk(Vector3(-2.6, 0, 7.4), -5.0, 3.0, Vector2(-1, 0))
-	check(ladder.room() == "archive", "walked into the archive")
+	await walk(Vector3(-1.8, 0, 7.4), -5.0, 9.0, Vector2(-1, 0))
+	check(ladder.room() == "archive", "rode the elevator down to the archive")
 	check(ladder.state.is_done("archive"), "archive counted")
 	await tap_screen("archive")
 
 	# Buy the key, walk to the trading floor.
 	ladder.state.win_tickets(400)
-	check(ladder.buy("door_key"), "bought the door key")
+	check(ladder.buy("door_key"), "bought the elevator key")
 	await frames(70)
-	await walk(Vector3(0, 0, 10.6), 13.2)
+	await walk(Vector3(0, 0, 10.4), 13.6, 9.0)
 	check(ladder.room() == "trading", "walked into the trading floor")
 	check(ladder.state.market_cash > 0, "tickets cashed out ($%d)" % ladder.state.market_cash)
+	# And back down: the same car rides you down to the arcade, then up again.
+	await walk(Vector3(0, 0, 13.6), 10.8, 9.0, Vector2(0, -1))
+	check(ladder.room() == "arcade", "rode the elevator back down to the arcade")
+	await walk(Vector3(0, 0, 10.4), 13.6, 9.0)
+	check(ladder.room() == "trading", "and back up")
 	await tap_screen("trading")
 	# Win the market the honest way: open it and trade the rumors.
 	var term = ladder._machines.trading.node
@@ -105,7 +113,7 @@ func _init() -> void:
 	check(ladder.state.is_done("market"), "market win opens the boardroom")
 	office._set_seat(null)
 	await frames(80)
-	await walk(Vector3(0, 0, 18.8), 21.2)
+	await walk(Vector3(0, 0, 18.6), 21.6, 9.0)
 	check(ladder.room() == "boardroom", "walked into the boardroom")
 	check(ladder.objective().contains("DALE"), "to-do: is that Dale?")
 	await tap_person("dale_board")
@@ -114,7 +122,7 @@ func _init() -> void:
 	await tap_screen("pitch")
 	ladder.pitch_won()
 	await frames(80)
-	await walk(Vector3(2.5, 0, 24.8), 27.4)
+	await walk(Vector3(2.5, 0, 24.6), 27.7, 9.0)
 	check(ladder.room() == "corner", "walked into the corner office")
 	await tap_screen("putt")
 	await tap_person("memo")
@@ -122,9 +130,9 @@ func _init() -> void:
 	check(ladder.state.is_done("memo"), "memo read")
 	check(ladder.objective().contains("TOP FLOOR"), "to-do: the top floor (%s)" % ladder.objective())
 	await frames(80)
-	# The top floor door: locked (the final room isn't built yet).
-	await walk(Vector3(-2.0, 0, 30.8), -4.2, 2.0, Vector2(-1, 0))
-	check(ladder.room() == "corner" and office._player.global_position.x > -3.6, "the top floor door is locked")
+	# The top floor elevator: locked (the final room isn't built yet).
+	await walk(Vector3(-1.6, 0, 30.8), -4.2, 2.5, Vector2(-1, 0))
+	check(ladder.room() == "corner" and office._player.global_position.x > -2.8, "the top floor elevator is locked")
 	check(ladder.hint().contains("TOP FLOOR"), "it says so")
 	# The bookcase opens once you've found the basement and Ray told you about
 	# the club (both happened earlier in this walk).
@@ -161,7 +169,7 @@ func walk(from: Vector3, until: float, seconds := 8.0, dir := Vector2(0, 1)) -> 
 		office._set_talk(false)
 	office._player.global_position = from
 	office._player.velocity = Vector3.ZERO
-	office._yaw = PI if dir.y > 0 else (PI / 2 if dir.x < 0 else -PI / 2)
+	office._yaw = PI if dir.y > 0 else (0.0 if dir.y < 0 else (PI / 2 if dir.x < 0 else -PI / 2))
 	office._pitch = 0.0
 	office._stick = Vector2(0, 1)
 	var t := 0.0
@@ -169,7 +177,7 @@ func walk(from: Vector3, until: float, seconds := 8.0, dir := Vector2(0, 1)) -> 
 		await physics_frame
 		t += 1.0 / 60.0
 		var p: Vector3 = office._player.global_position
-		var past: bool = (p.z >= until) if dir.y > 0 else ((p.x <= until) if dir.x < 0 else p.x >= until)
+		var past: bool = (p.z >= until) if dir.y > 0 else ((p.z <= until) if dir.y < 0 else ((p.x <= until) if dir.x < 0 else p.x >= until))
 		if past:
 			break
 	office._stick = Vector2.ZERO

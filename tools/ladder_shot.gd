@@ -4,11 +4,12 @@ extends SceneTree
 ## the doors open, so every room can be visited:
 ##   OUT=/some/dir LAYOUT=portrait xvfb-run -a -s "-screen 0 720x1280x24" \
 ##     godot --rendering-driver opengl3 --resolution 720x1280 -s res://tools/ladder_shot.gd
-## Shots: arcade from the door, the claw and Gloria, playing the claw,
+## Shots: the office elevator, riding it (doors shut, the floor ticking),
+## the doors opening onto the arcade, the arcade, the claw and Gloria, playing the claw,
 ## the coin pusher, the Fall Guy column mid-bounce, talking to Gloria (line, replies,
 ## answer), the prize counter, the trading floor and its terminal, the
 ## boardroom and the pitch, the corner office and the memo, the stage and the
-## set list, the archive. It wipes user://dale.cfg, ladder.cfg, coworkers.cfg.
+## set list, the basement elevator, the archive, the top floor elevator. It wipes user://dale.cfg, ladder.cfg, coworkers.cfg.
 
 var office
 var n := 0
@@ -37,9 +38,22 @@ func _init() -> void:
 	for i in 5: await process_frame
 	office._touch = true
 	await _frames(60)
-	# Through the office door into the arcade.
-	await _stand(Vector3(1.8, 0, 3.2), 0.0, PI, -0.05)
-	await _stand(Vector3(0.6, 0, 4.6), PI + 0.15, 0, -0.08)
+	# Up the office elevator to the arcade.
+	await _stand(Vector3(0.9, 0, 1.4), PI + 0.35, 0, 0.0)
+	_shot("lift_office")
+	await _stand(Vector3(1.8, 0, 2.6), PI, 0, 0.0)
+	await _stand(Vector3(1.8, 0, 4.4), PI, 0, -0.02, 1)
+	var lift = office._ladder._lifts.office
+	while lift.phase != "ride":
+		await process_frame
+	await _frames(6)
+	_shot("lift_ride")
+	while lift.phase != "idle" or lift.open_amount(1) < 1.0:
+		await process_frame
+	office._player.position = Vector3(1.8, 0, 3.9)
+	await _frames(10)
+	_shot("lift_arrive")
+	await _stand(Vector3(0.5, 0, 6.2), PI + 0.15, 0, -0.08)
 	_shot("arcade")
 	await _stand(Vector3(-0.8, 0, 5.4), PI / 2 + 0.25, 0, -0.1)
 	_shot("claw_gloria")
@@ -94,7 +108,7 @@ func _init() -> void:
 	office._set_seat(null)
 	await _frames(20)
 	# The trading floor.
-	await _stand(Vector3(0.3, 0, 12.8), PI, 0, -0.05)
+	await _stand(Vector3(0.3, 0, 13.7), PI, 0, -0.05)
 	_shot("trading")
 	var trade = office._ladder._machines.trading
 	office._set_seat(trade.pc)
@@ -138,17 +152,21 @@ func _init() -> void:
 	_shot("set_list")
 	office._set_seat(null)
 	await _frames(20)
-	await _stand(Vector3(-3.9, 0, 7.4), PI / 2, 0, -0.05)
+	await _stand(Vector3(-1.2, 0, 8.6), PI / 2 - 0.5, 0, -0.05)
+	_shot("lift_basement")
+	await _stand(Vector3(-5.0, 0, 7.4), PI / 2, 0, -0.05)
 	_shot("archive")
+	await _stand(Vector3(-0.6, 0, 30.4), PI / 2 - 0.15, 0, 0.0)
+	_shot("lift_top")
 	quit()
 
 
-func _stand(at: Vector3, yaw: float, _unused: float, pitch: float) -> void:
+func _stand(at: Vector3, yaw: float, _unused: float, pitch: float, wait := 45) -> void:
 	office._player.position = at
 	office._player.velocity = Vector3.ZERO
 	office._yaw = yaw
 	office._pitch = pitch
-	await _frames(45)
+	await _frames(wait)
 
 
 func _frames(k: int) -> void:

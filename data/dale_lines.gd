@@ -122,15 +122,15 @@ const CHAPTERS := [
 	},
 	{
 		"id": "ladder",
-		"fact": "The new hire proved a theorem at the Proof Desk. Upstairs heard. You opened the door behind them: the break room arcade, then up the ladder (trading floor, boardroom, corner office). You've never been past that door yourself. You told them to talk to everyone in the arcade.",
+		"fact": "The new hire proved a theorem at the Proof Desk. Upstairs heard. You unlocked the elevator behind them: the break room arcade one floor up, then up the ladder (trading floor, boardroom, corner office). You've never taken that elevator yourself. You told them to talk to everyone in the arcade.",
 		"title": "THE LADDER",
 		"need": {"proof_wins": 1},
 		"goal": "PROVE A THEOREM AT THE PROOF DESK",
 		"hint": "Proof Desk, under the chalkboard. Prove one. Solve something big.",
 		"steps": [
 			{"dale": "You proved it. And somebody upstairs heard. UPSTAIRS, kid."},
-			{"dale": "See the door behind you? Break room arcade. Then the trading floor. Then up, up, up."},
-			{"dale": "Fifteen years and I've never been past that door. Never even tried the handle."},
+			{"dale": "See the elevator behind you? Break room arcade, one floor up. Then the trading floor. Then up, up, up."},
+			{"dale": "Fifteen years and I've never taken that elevator. Never even pressed the button."},
 			{"choices": [
 				{"text": "What's up there?", "reply": "Rumor says a corner office. And a smoothie machine. I've had dreams about it.", "trust": 0},
 				{"text": "Come with me, Dale.", "reply": "Me? I'm QA. ...You'd really want me up there? Huh. Maybe someday.", "trust": 1},

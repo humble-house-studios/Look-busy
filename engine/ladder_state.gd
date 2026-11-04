@@ -1,10 +1,10 @@
 class_name LadderState
 extends RefCounted
-## Progress past the office door, up the ladder: the arcade (tokens in,
-## tickets out, the prize counter sells the Door Key), the trading floor
+## Progress up the ladder, one elevator ride per floor: the arcade (tokens
+## in, tickets out, the prize counter sells the Elevator Key), the trading floor
 ## (tickets cash out as your portfolio; double it), the boardroom (Dale is
 ## waiting there: he's the founder; then win the pitch), the corner office
-## (his memo) and the locked TOP FLOOR door (the final room; not built yet).
+## (his memo) and the locked TOP FLOOR elevator (the final room; not built yet).
 ## Hidden extras for players who dig: the archive in the arcade basement, and
 ## behind a bookcase in the corner office the old comedy club stage (opens
 ## once you've found the archive and Ray told you the building was a club).
@@ -26,7 +26,7 @@ const DOOR_KEY := "door_key"
 const DOOR_KEY_COST := 300
 ## The prize counter. `for` = the coworker who wants it as a gift.
 const PRIZES := [
-	{"id": "door_key", "name": "DOOR KEY", "cost": DOOR_KEY_COST, "note": "Opens the door to the next room"},
+	{"id": "door_key", "name": "ELEVATOR KEY", "cost": DOOR_KEY_COST, "note": "Takes the elevator up to the next floor"},
 	{"id": "plush", "name": "TOP-SHELF PLUSH", "cost": 80, "note": "Gloria has wanted this for eleven years", "for": "gloria"},
 	{"id": "tie", "name": "STOCK-TICKER TIE", "cost": 60, "note": "Kev would wear this to his wedding", "for": "kev"},
 	{"id": "stress_ball", "name": "STRESS BALL", "cost": 40, "note": "For Bernie's desk. Spare Dale.", "for": "bernie"},
@@ -211,9 +211,9 @@ func door_open(door: String, office_done: bool, club_known := false) -> bool:
 ## The on-screen to-do once Dale's story is done.
 func objective(secret_count: int) -> String:
 	if not is_done("entered"):
-		return "GO THROUGH THE DOOR BEHIND YOU"
+		return "TAKE THE ELEVATOR BEHIND YOU"
 	if not has(DOOR_KEY):
-		return "WIN %d TICKETS, BUY THE DOOR KEY (%d/%d)" % [DOOR_KEY_COST, mini(tickets, DOOR_KEY_COST), DOOR_KEY_COST]
+		return "WIN %d TICKETS, BUY THE ELEVATOR KEY (%d/%d)" % [DOOR_KEY_COST, mini(tickets, DOOR_KEY_COST), DOOR_KEY_COST]
 	if not is_done("market"):
 		return "TRADING FLOOR: DOUBLE YOUR MONEY"
 	if not is_done("reveal"):

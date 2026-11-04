@@ -85,7 +85,7 @@ func _stuff_text() -> String:
 func _buy(id: String) -> void:
 	if hub and hub.buy(id):
 		sfx("fanfare" if id == "door_key" else "chime")
-		banner("DOOR KEY!\nTHE DOOR IS OPEN" if id == "door_key" else LadderState.prize(id).name + "!", 2.4)
+		banner("ELEVATOR KEY!\nGOING UP" if id == "door_key" else LadderState.prize(id).name + "!", 2.4)
 	refresh()
 
 

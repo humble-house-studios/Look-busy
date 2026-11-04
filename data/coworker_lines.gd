@@ -182,9 +182,9 @@ const PEOPLE := {
 		"rewards": [
 			{"line": "Found these under the claw machine. Five tokens. Yours.", "reward": "tokens:5"},
 			{"line": "This building was a comedy club. The Brick Wall. A comic bought it in 2011, put in desks.", "secret": "The building was a comedy club, The Brick Wall. A comic bought it in 2011."},
-			{"line": "Here. Key to the basement door, by the claw. Stuff they shelved is down there. Lock up after.", "reward": "item:archive_key", "perk": "ARCHIVE KEY: opens the basement door in the arcade"},
+			{"line": "Here. Basement key, for the elevator by the claw. Stuff they shelved is down there. Lock up after.", "reward": "item:archive_key", "perk": "ARCHIVE KEY: the elevator by the claw goes down to the basement"},
 		],
-		"after": ["Basement's by the claw. Lock up after.", "Mind the bucket.", "Sometimes I still hear them laughing."],
+		"after": ["Basement elevator's by the claw. Lock up after.", "Mind the bucket.", "Sometimes I still hear them laughing."],
 	},
 }
 

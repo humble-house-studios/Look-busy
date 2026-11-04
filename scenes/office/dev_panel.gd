@@ -67,7 +67,7 @@ func setup(o: Node) -> void:
 	_section(list, "DALE'S STORY", [
 		["MEET NEXT GOAL", _meet_goal],
 		["SKIP CHAPTER", _skip_chapter],
-		["FINISH STORY\n(OPENS THE DOOR)", _finish_story],
+		["FINISH STORY\n(UNLOCKS THE ELEVATOR)", _finish_story],
 	])
 	_section(list, "LOOK BUSY (WORKDAY)", [
 		["BOSS COMES\nBY NOW", _boss_now],
@@ -96,7 +96,7 @@ func setup(o: Node) -> void:
 		["+300 TICKETS", _tickets],
 		["BEAT ALL\nMACHINES", _machines],
 		["MAX ALL\nCOWORKERS", _coworkers],
-		["OPEN ALL DOORS", _doors],
+		["UNLOCK ALL FLOORS", _doors],
 		["DALE'S REVEAL\n(BOARDROOM)", _reveal],
 		["OPEN THE\nHIDDEN STAGE", _club],
 	])
@@ -210,7 +210,7 @@ func _refresh() -> void:
 	var ladder = office._ladder
 	var dale := story.file_label()
 	if story.next_chapter().is_empty():
-		dale = "DONE, DOOR OPEN"
+		dale = "DONE, ELEVATOR UNLOCKED"
 	var goal: String = story.objective(stats) if not story.next_chapter().is_empty() else ladder.objective()
 	_info.text = "DALE: %s   ROOM: %s\nTOKENS %d  TICKETS %d  SECRETS %d/%d\nTO-DO: %s" % [
 		dale, ladder.room().to_upper(), ladder.state.tokens, ladder.state.tickets,
@@ -261,7 +261,7 @@ func _skip_chapter() -> void:
 	office._dale_story.finish(ch.id, DaleStory.read_stats())
 	office._ladder.dev_refresh()
 	var next: Dictionary = office._dale_story.next_chapter()
-	_say("SKIPPED \"%s\". %s" % [ch.title, "THE DOOR'S OPEN." if next.is_empty() else "NEXT: " + str(next.get("goal", ""))])
+	_say("SKIPPED \"%s\". %s" % [ch.title, "THE ELEVATOR'S UNLOCKED." if next.is_empty() else "NEXT: " + str(next.get("goal", ""))])
 
 
 func _finish_story() -> void:
@@ -271,7 +271,7 @@ func _finish_story() -> void:
 		office._dale_story.finish(ch.id, DaleStory.read_stats())
 		n += 1
 	office._ladder.dev_refresh()
-	_say("DALE'S STORY DONE (%d SKIPPED). THE DOOR BEHIND YOU IS OPEN." % n)
+	_say("DALE'S STORY DONE (%d SKIPPED). THE ELEVATOR BEHIND YOU IS UNLOCKED." % n)
 
 
 # ---------------------------------------------------------------- Look Busy
@@ -401,7 +401,7 @@ func _tokens() -> void:
 func _tickets() -> void:
 	office._ladder.state.win_tickets(300)
 	office._ladder.dev_refresh()
-	_say("+300 TICKETS. THE DOOR KEY IS 300 AT THE PRIZE COUNTER.")
+	_say("+300 TICKETS. THE ELEVATOR KEY IS 300 AT THE PRIZE COUNTER.")
 
 
 func _machines() -> void:
@@ -420,7 +420,7 @@ func _doors() -> void:
 	_finish_story()
 	Dev.open_ladder(office._ladder.state)
 	office._ladder.dev_refresh()
-	_say("EVERY DOOR IS OPEN. TELEPORT OR WALK ON THROUGH.")
+	_say("EVERY FLOOR IS UNLOCKED. TELEPORT OR RIDE ON UP.")
 
 
 func _reveal() -> void:

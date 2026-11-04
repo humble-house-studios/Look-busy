@@ -145,7 +145,7 @@ func _check_end() -> void:
 		if hub and not hub.state.is_done("market"):
 			hub.market_won()
 		sfx("jackpot")
-		banner("DOUBLED!\nTHE BOARDROOM\nDOOR IS OPEN", 3.5, Color(0.5, 1.0, 0.6))
+		banner("DOUBLED!\nTHE ELEVATOR GOES\nUP TO THE BOARDROOM", 3.5, Color(0.5, 1.0, 0.6))
 	else:
 		sfx("sad_trombone", -4.0)
 		banner("CLOSING BELL.\nNOT THIS TIME.", 3.0, Color(1.0, 0.5, 0.4))

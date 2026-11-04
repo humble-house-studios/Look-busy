@@ -186,12 +186,18 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   camera frames the screen clear of the buttons, the HUD and the card
   (`_seat_reserve()`), so no game's score hides under STAND UP.
   Tests: `tests/test_desk_goals.gd`.
-- **The ladder** (`scenes/office/ladder.gd`): past the office door, built into
-  the same 3D world (same walking, sitting, talking): the arcade (claw, coin
+- **The ladder** (`scenes/office/ladder.gd`): up the office elevator, built into
+  the same 3D world (same walking, sitting, talking). Every floor is reached by
+  elevator (`scenes/office/lift.gd`, one car per pair of floors, set in the wall
+  between them: walk in, doors shut, the floor counter ticks, ding, the far
+  doors open; no teleport, so physics and touch work unchanged). Each lift is
+  locked by `LadderState.door_open(<floor id>)` (ids kept from the old doors;
+  goal keys stay `door_<id>`); the bookcase to the stage is the one real door.
+  Look Busy's boss rides the office lift down (`lift_hold()`). Floors: the arcade (claw, coin
   pusher, Fall Guy ragdoll, prize counter, five coworkers), the basement
   archive, the trading floor, the boardroom (Dale reveals he's the founder),
-  the corner office (his memo; the locked TOP FLOOR door = the final room, not
-  built yet) and, hidden behind a bookcase, the old comedy club stage (opens
+  the corner office (his memo; the locked TOP FLOOR elevator = the final
+  room, not built yet) and, hidden behind a bookcase, the old comedy club stage (opens
   after the archive + Ray's secret; no finale).
   Every screen is a machine in `scenes/ladder/` (extends `machine.gd`, 720×1280,
   its own SubViewport, Buttons only so the pad cursor works) added with
@@ -222,7 +228,7 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   grain/scanlines); `tools/machine_shot.gd` shoots it on its own. Rooms get their own lights
   through `ps1.gdshader`'s `room_*` uniforms. Rooms out of reach hide and their
   machines pause. Screenshots: `tools/ladder_shot.gd`; a scripted walkthrough of
-  every door, screen and coworker: `godot --headless -s res://tools/ladder_walk.gd`
+  every elevator ride, screen and coworker: `godot --headless -s res://tools/ladder_walk.gd`
   (prints PASS/FAIL; both wipe the ladder saves).
   **Talking to coworkers out loud:** after a coworker's talk, HOLD TO TALK
   works like Dale's (tap replies stay the backup). `Coworkers.chat_spec()`

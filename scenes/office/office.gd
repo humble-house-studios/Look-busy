@@ -28,12 +28,13 @@ extends Node
 ##   phone's own voice reading his lines. His story (engine/dale_story.gd,
 ##   data/dale_lines.gd) unlocks chapter by chapter as you play the games;
 ##   he's your guide from desk to desk, and a to-do (top left) says what's next.
-## - The ladder (scenes/office/ladder.gd): once Dale's story is done, the door
-##   behind you opens onto the rooms of the ladder: the arcade (coworkers to
-##   talk to, machines to win tickets), the trading floor, the boardroom, the
-##   corner office and the stage. Same walking, sitting and talking.
+## - The ladder (scenes/office/ladder.gd): once Dale's story is done, the
+##   elevator behind you goes up the floors of the ladder, one ride each
+##   (scenes/office/lift.gd): the arcade (coworkers to talk to, machines to
+##   win tickets), the trading floor, the boardroom, the corner office, and
+##   the stage behind a bookcase. Same walking, sitting and talking.
 ## - Goal marker: a spinning yellow diamond over whatever the to-do wants next
-##   (engine/goal_target.gd picks it), or over the next door on the way; off
+##   (engine/goal_target.gd picks it), or over the next elevator on the way; off
 ##   screen, a chevron on the screen edge points at it with the distance.
 ## - Pause menu (scenes/office/pause_menu.gd): Esc, Start while walking, or the
 ##   II button. Pauses the world; volumes (the Music / Effects buses), look
@@ -868,13 +869,15 @@ func _build_room() -> void:
 	_box(Vector3(7.4, 0.1, 7.4), Vector3(0, -0.05, 0.5), carpet, true)
 	_box(Vector3(7.4, 0.1, 7.4), Vector3(0, 2.65, 0.5), ceiling, true)
 	_box(Vector3(7.4, 2.6, 0.1), Vector3(0, 1.3, -3.05), wall, true)
-	# South wall, with a gap for the door to the ladder (ladder.gd hangs the door).
-	_box(Vector3(5.0, 2.6, 0.1), Vector3(-1.2, 1.3, 4.05), wall, true)
-	_box(Vector3(1.4, 2.6, 0.1), Vector3(3.0, 1.3, 4.05), wall, true)
-	_box(Vector3(1.0, 0.5, 0.1), Vector3(1.8, 2.35, 4.05), wall, true)
+	# South wall, with a gap (x 0.85..2.75, 2.5 tall) for the elevator up the
+	# ladder (ladder.gd builds it: scenes/office/lift.gd).
+	_box(Vector3(4.55, 2.6, 0.1), Vector3(-1.425, 1.3, 4.05), wall, true)
+	_box(Vector3(0.95, 2.6, 0.1), Vector3(3.225, 1.3, 4.05), wall, true)
+	_box(Vector3(1.9, 0.1, 0.1), Vector3(1.8, 2.55, 4.05), wall, true)
 	_box(Vector3(0.1, 2.6, 7.2), Vector3(-3.55, 1.3, 0.5), wall, true)
 	_box(Vector3(0.1, 2.6, 7.2), Vector3(3.55, 1.3, 0.5), wall, true)
-	for b in [[Vector3(7.0, 0.1, 0.02), Vector3(0, 0.05, -2.99)], [Vector3(7.0, 0.1, 0.02), Vector3(0, 0.05, 3.99)],
+	for b in [[Vector3(7.0, 0.1, 0.02), Vector3(0, 0.05, -2.99)], [Vector3(4.35, 0.1, 0.02), Vector3(-1.325, 0.05, 3.99)],
+			[Vector3(0.75, 0.1, 0.02), Vector3(3.125, 0.05, 3.99)],
 			[Vector3(0.02, 0.1, 7.0), Vector3(-3.49, 0.05, 0.5)], [Vector3(0.02, 0.1, 7.0), Vector3(3.49, 0.05, 0.5)]]:
 		_box(b[0], b[1], trim)
 
@@ -1330,7 +1333,7 @@ func _build_props() -> void:
 		_clock_hands.append(pivot)
 
 	# Sign on the door side.
-	_label("BREAK ROOM ->", Vector3(0.4, 1.9, 3.99), 30, Color(0.9, 0.9, 0.8), Vector3(0, PI, 0))
+	_label("<- ELEVATOR", Vector3(0.1, 1.95, 3.99), 24, Color(0.9, 0.9, 0.8), Vector3(0, PI, 0))
 
 
 ## Dale's corner under the window: a cluttered desk facing into the room, and

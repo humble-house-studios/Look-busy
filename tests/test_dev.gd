@@ -30,7 +30,7 @@ func test_meeting_every_goal_walks_dale_to_the_door() -> void:
 		assert_true(DaleStory.unlocked(ch, stats), "%s unlocks once its goal is met" % ch.id)
 		d.finish(ch.id, stats)
 	assert_eq(d.done.size(), DaleLines.CHAPTERS.size())
-	assert_eq(d.objective(stats), "GO THROUGH THE DOOR BEHIND YOU")
+	assert_eq(d.objective(stats), "TAKE THE ELEVATOR BEHIND YOU")
 
 
 func test_max_coworkers_pays_every_tier_once() -> void:

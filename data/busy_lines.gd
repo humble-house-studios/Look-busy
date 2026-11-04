@@ -11,7 +11,7 @@ class_name BusyLines
 ##   habit: the one-line tip on the morning card.
 ##   speed (m/s), range (m), cone (degrees either side of where they face),
 ##   rate: suspicion per second while they watch you play a game.
-##   creak: the door creaks when they come in. steps_db: how loud they walk.
+##   creak: the elevator dings when they arrive (off = silent). steps_db: how loud they walk.
 ##   ring / call: seconds a video call rings, then stays connected.
 ##   route: office spots (x, z) in order; wait = seconds they stop there,
 ##     look = what they stare at, desk = they check that you're at a desk.
@@ -24,7 +24,7 @@ const MAIN_DESK := Vector2(0.0, -2.4)
 ## The patrol on floors with a walking boss: in through the office door,
 ## past your desk, Dale, the Pong desk and the right wall, and back out.
 const ROUTE := [
-	{"p": Vector2(1.8, 5.2)},
+	{"p": Vector2(1.8, 4.6)},
 	{"p": Vector2(1.8, 3.3)},
 	{"p": Vector2(0.9, 1.5)},
 	{"p": Vector2(0.15, -1.2), "wait": 2.6, "look": Vector2(0.0, -2.4), "desk": true},
@@ -32,7 +32,7 @@ const ROUTE := [
 	{"p": Vector2(-2.0, 1.9), "wait": 1.6, "look": Vector2(-3.05, 2.0)},
 	{"p": Vector2(0.6, 2.0), "wait": 1.8, "look": Vector2(3.0, 0.2)},
 	{"p": Vector2(1.8, 3.3)},
-	{"p": Vector2(1.8, 5.2)},
+	{"p": Vector2(1.8, 4.6)},
 ]
 
 const BOSSES := [
@@ -61,7 +61,7 @@ const BOSSES := [
 	},
 	{
 		"id": "ceo", "name": "THE CEO", "title": "NOBODY HAS MET HIM", "kind": "walk",
-		"habit": "THE CEO. NOBODY HAS MET HIM. NO CREAK, SOFT STEPS. 10:05, 2:05, 4:05.",
+		"habit": "THE CEO. NOBODY HAS MET HIM. NO DING, SOFT STEPS. 10:05, 2:05, 4:05.",
 		"at": 65, "every": 120, "speed": 1.5, "range": 7.5, "cone": 65.0, "rate": 50.0,
 		"creak": false, "steps_db": -20.0,
 		"look_body": {"skin": Color(0.55, 0.5, 0.5), "shirt": Color(0.06, 0.06, 0.08), "pants": Color(0.05, 0.05, 0.06),

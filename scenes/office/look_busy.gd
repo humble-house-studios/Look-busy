@@ -6,7 +6,7 @@ extends Node
 ##     centre, with the suspicion meter and your strikes). The wall clock
 ##     shows it too.
 ##   - The boss comes by on a fixed schedule (data/busy_lines.gd): walking
-##     bosses come in through the office door (it creaks), walk a route past
+##     bosses ride the elevator down (it dings), walk a route past
 ##     every desk and stop at yours; footsteps get louder, and seated you
 ##     can see their reflection in the screen. The WFH boss rings your screen
 ##     instead, then looks through it.
@@ -52,7 +52,6 @@ const HUD_W := 300.0
 const HUD_H := 118.0
 ## Bosses (and first-time tips) already introduced: user://look_busy.cfg, [seen].
 const SEEN_SECTION := "seen"
-const CREAK := preload("res://audio/creak.wav")
 const COUGH := preload("res://audio/cough.wav")
 const BUSTED := preload("res://audio/busted.wav")
 const RING := preload("res://audio/ring.wav")
@@ -137,7 +136,7 @@ func build() -> void:
 	for b in BusyLines.BOSSES:
 		if b.kind != "walk":
 			continue
-		var root: Node3D = office._ladder._person("office", "boss_" + b.id, Vector3(DOOR.x, 0, DOOR.z + 1.2), PI, b.look_body)
+		var root: Node3D = office._ladder._person("office", "boss_" + b.id, Vector3(DOOR.x, 0, DOOR.z + 0.5), PI, b.look_body)
 		root.visible = false
 		_bosses[b.id] = root
 	# The danger glow sits under the rest of the HUD.
@@ -371,7 +370,6 @@ func _start_visit() -> void:
 	_close_done = false
 	_visit_strike = false
 	_visit_here = _in_office()
-	office._ladder.peek_arcade(true)
 	_first_meeting(b)
 
 
@@ -383,8 +381,6 @@ func _end_visit() -> void:
 		_bosses[id].visible = false
 	if _door_open:
 		_swing_door(false)
-	if office and office._ladder:
-		office._ladder.peek_arcade(false)
 
 
 func _tick_visit(delta: float) -> void:
@@ -406,7 +402,7 @@ func _tick_visit(delta: float) -> void:
 	var body: Node3D = _boss_node.get_child(0)
 	body.position.y = absf(sin(_visit_t * 7.0)) * 0.03 if walking else 0.0
 	body.rotation.z = sin(_visit_t * 7.0) * 0.03 if walking else 0.0
-	# The door: opens as they reach it (creak), shuts behind them.
+	# The elevator: they ride down, its doors open (ding), shut behind them.
 	var to_door := Vector2(pa.pos.x - DOOR.x, pa.pos.y - DOOR.z).length()
 	if to_door < 1.3 and not _door_open:
 		_swing_door(true)
@@ -637,18 +633,13 @@ func crew_text() -> String:
 			names.append(Coworkers.person(id).name)
 		if not names.is_empty():
 			parts.append("%s: %s." % ["Lookouts" if r == "lookout" else "Snitches", ", ".join(names)])
-	return " ".join(parts) if not parts.is_empty() else "No lookouts yet. Make friends in the break room (past the door)."
+	return " ".join(parts) if not parts.is_empty() else "No lookouts yet. Make friends in the break room (up the elevator)."
 
 
 func _swing_door(open: bool) -> void:
 	_door_open = open
-	var d: Dictionary = office._ladder._doors.get("office", {})
-	if d.is_empty() or d.open:
-		return
-	var t := create_tween()
-	t.tween_property(d.hinge, "rotation:y", -PI * 0.55 if open else 0.0, 0.7).set_trans(Tween.TRANS_SINE)
-	if open and bool(wd.boss().get("creak", true)):
-		_play(CREAK, _distance_db(Vector2(DOOR.x, DOOR.z), -2.0))
+	if office and office._ladder:
+		office._ladder.lift_hold("office", open, bool(wd.boss().get("creak", true)))
 
 
 func _step(db: float) -> void:
@@ -786,7 +777,7 @@ func _ship_pay(r: Dictionary) -> void:
 	var button := "NEXT WEEK (FLOOR %d)" % wd.floor_i
 	if r.promoted and wd.floor_i >= BusyLines.FLOORS:
 		head = "TOP OF THE BUILDING"
-		body += "A great week, and there's no floor left above this one. Just a door at the very top that nobody has a key to. Yet."
+		body += "A great week, and there's no floor left above this one. Just an elevator to the very top that nobody has a key for. Yet."
 	elif r.promoted:
 		var next := Workday.boss_for(wd.floor_i + 1)
 		head = "PROMOTED!"
