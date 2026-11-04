@@ -193,6 +193,11 @@ class Computer:
 	## Look Busy's alt-tab: another viewport (the spreadsheet) shown on this
 	## screen and taking its input instead of the game.
 	var cover: Viewport
+	## An arcade cage (scenes/ladder/cage3d.gd): no screen at all, the game is
+	## the real 3D cabinet behind this rect. The view (transparent) is only
+	## its controls, laid over the glass while you sit there.
+	var overlay := false
+	var shown := 0.0
 
 	## Where input goes: the cover while there is one, else the game.
 	func target() -> Viewport:
@@ -597,8 +602,9 @@ func _is_music(player: AudioStreamPlayer) -> bool:
 ## A screen showing a game's viewport, plus its crisp copy for the screen pass.
 ## view gets the input, in `pixels` units (the game's canvas size); shown
 ## (default: view) is what the screen displays.
-func _add_computer(screen: Node3D, size: Vector2, view: Viewport, pixels: Vector2i, touch_events := false, shown: Viewport = null) -> Computer:
+func _add_computer(screen: Node3D, size: Vector2, view: Viewport, pixels: Vector2i, touch_events := false, shown: Viewport = null, overlay := false) -> Computer:
 	var pc := Computer.new()
+	pc.overlay = overlay
 	pc.screen = screen
 	pc.size = size
 	pc.view = view
@@ -630,6 +636,12 @@ func _add_computer(screen: Node3D, size: Vector2, view: Viewport, pixels: Vector
 	hi_mi.layers = LAYER_SCREEN
 	hi_mi.position.z = 0.001
 	screen.add_child(hi_mi)
+	if overlay:
+		# Nothing on the glass in the world; up close only the controls.
+		lo_mi.visible = false
+		pc.hi_mat.set_shader_parameter("use_alpha", 1.0)
+		pc.hi_mat.set_shader_parameter("glass", 0.0)
+		pc.hi_mat.set_shader_parameter("fade", 0.0)
 	_computers.append(pc)
 	return pc
 
@@ -2705,7 +2717,11 @@ func _process(delta: float) -> void:
 	var bus_vol := {}
 	for pc in _computers:
 		var dist := _camera.global_position.distance_to(pc.screen.global_position)
-		pc.hi_mat.set_shader_parameter("fade", clampf((4.0 - dist) / 1.5, 0.0, 1.0))
+		if pc.overlay:
+			pc.shown = move_toward(pc.shown, 1.0 if _seat == pc and _glide > 0.6 else 0.0, delta * 4.0)
+			pc.hi_mat.set_shader_parameter("fade", pc.shown)
+		else:
+			pc.hi_mat.set_shader_parameter("fade", clampf((4.0 - dist) / 1.5, 0.0, 1.0))
 		var vol := clampf((AUDIO_FAR - dist) / (AUDIO_FAR - AUDIO_NEAR), 0.0, 1.0)
 		if not pc.screen.is_visible_in_tree():
 			vol = 0.0

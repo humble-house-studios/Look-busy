@@ -18,12 +18,14 @@ extends Node
 ##     moves once you've found the basement and Ray told you about the club.
 ##     An empty, dusty club; one more set if you like. No finale.
 ## Each screen is a machine scene (scenes/ladder/) in its own SubViewport,
-## added with the office's _add_computer(). Rooms out of reach are hidden and
+## added with the office's _add_computer(). The three arcade cabinets have no
+## screen: each is a glass cage built into the room (scenes/ladder/cage3d.gd)
+## with real physics inside, and its SubViewport is only the controls, laid
+## over the glass while you're seated. Rooms out of reach are hidden and
 ## their machines paused. Rules: engine/ladder_state.gd, engine/coworkers.gd.
 ## Design: docs/narrative.md (The Ladder).
 
 const MACHINE_PX := Vector2i(720, 1280)
-const CAB_SCREEN := Vector2(0.36, 0.64)
 const DOOR_W := 1.0
 const DOOR_H := 2.1
 ## z where each room starts (its front wall), in walking order.
@@ -239,27 +241,28 @@ func _cabinet(room: String, at: Vector3, rot_y: float, body_col: Color, title: S
 	rig.position = at
 	rig.rotation.y = rot_y
 	p.add_child(rig)
-	var cy := 1.28
 	match machine:
 		"claw":
-			_crane_cabinet(room, rig, body_col, title, title_col, cy)
+			_claw_shell(room, rig, body_col, title, title_col)
 		"pusher":
-			_pusher_cabinet(room, rig, body_col, title, title_col, cy)
+			_pusher_shell(room, rig, body_col, title, title_col)
 		_:
-			_upright_cabinet(room, rig, body_col, title, title_col, cy)
+			_column_shell(room, rig, body_col, title, title_col)
+	# No screen: the game is the glass cage itself (built by the machine into
+	# `cage`, in the room's own 3D). SEAT is the rect the seated camera frames
+	# and the machine's controls are laid over.
+	var seat: Dictionary = load(script).SEAT
 	var screen := Node3D.new()
-	screen.position = Vector3(0, cy, 0.182)
+	screen.position = seat.at
+	screen.rotation.x = seat.tilt
 	rig.add_child(screen)
-	_machine(machine, script, room, screen, CAB_SCREEN)
+	var cage := preload("res://scenes/ladder/cage3d.gd").new()
+	cage.name = machine + "_cage"
+	rig.add_child(cage)
+	_machine(machine, script, room, screen, seat.size, cage)
 
 
-## Bits every cabinet shares: the bezel round the screen, a coin door with
-## lit slots, chaser bulbs along a line.
-func _bezel(room: String, rig: Node3D, cy: float, col: Color) -> void:
-	_box(Vector3(CAB_SCREEN.x + 0.1, CAB_SCREEN.y + 0.1, 0.03), Vector3(0, cy, 0.158), _mat(room, col.darkened(0.35), 6, col.darkened(0.6), 60.0), false, Vector3.ZERO, rig)
-	_box(Vector3(CAB_SCREEN.x + 0.035, CAB_SCREEN.y + 0.035, 0.02), Vector3(0, cy, 0.168), _mat(room, Color(0.02, 0.02, 0.03)), false, Vector3.ZERO, rig)
-
-
+## Bits every cabinet shares: a coin door with lit slots, chaser bulbs.
 func _coin_door(room: String, rig: Node3D, at: Vector3, slots := 2) -> void:
 	var steel := _mat(room, Color(0.55, 0.55, 0.58), 6, Color(0.4, 0.4, 0.44), 80.0)
 	_box(Vector3(0.3, 0.3, 0.02), at, steel, false, Vector3.ZERO, rig)
@@ -277,149 +280,144 @@ func _bulbs(room: String, rig: Node3D, from: Vector3, to: Vector3, n: int) -> vo
 		office._ball(0.018, from.lerp(to, t), _glow(room, c), rig)
 
 
-## CLAW KING: a crane cabinet. Base with a prize door and a control ledge
-## (joystick, big DROP button), a glass case on chrome posts (the screen is
-## its front window, plush stacked behind the side panes), a lit canopy.
-func _crane_cabinet(room: String, rig: Node3D, body_col: Color, title: String, title_col: Color, cy: float) -> void:
+## CLAW KING's cabinet around its glass cage (scenes/ladder/claw.gd builds
+## the inside): a base with the prize tray cut into its front (won prizes
+## land there), a control ledge with a joystick and DROP button, chrome
+## posts at the glass corners, a lit canopy with chaser bulbs.
+func _claw_shell(room: String, rig: Node3D, body_col: Color, title: String, title_col: Color) -> void:
 	var body := _mat(room, body_col, 6, body_col.darkened(0.25), 30.0)
 	var stripe := _mat(room, title_col.darkened(0.15), 6, title_col.darkened(0.4), 40.0)
 	var chrome := _mat(room, Color(0.78, 0.78, 0.84), 6, Color(0.6, 0.6, 0.68), 90.0)
 	var dark := _mat(room, Color(0.04, 0.03, 0.05))
-	var glass := _mat(room, Color(0.12, 0.16, 0.22), 6, Color(0.2, 0.26, 0.34), 30.0, Color(0.03, 0.04, 0.06))
-	# Base.
-	_box(Vector3(0.82, 0.9, 0.7), Vector3(0, 0.45, -0.17), body, true, Vector3.ZERO, rig)
-	_box(Vector3(0.84, 0.06, 0.72), Vector3(0, 0.03, -0.17), dark, false, Vector3.ZERO, rig)
-	_box(Vector3(0.84, 0.07, 0.72), Vector3(0, 0.62, -0.17), stripe, false, Vector3.ZERO, rig)
-	# Prize door, bottom left, and the coin door, bottom right.
-	_box(Vector3(0.26, 0.26, 0.02), Vector3(-0.2, 0.3, 0.19), chrome, false, Vector3.ZERO, rig)
-	_box(Vector3(0.2, 0.18, 0.02), Vector3(-0.2, 0.3, 0.2), dark, false, Vector3.ZERO, rig)
-	_label("PRIZE", Vector3(-0.2, 0.47, 0.19), 12, Color(1.0, 0.85, 0.4), rig)
-	_coin_door(room, rig, Vector3(0.2, 0.3, 0.19), 1)
+	# Base: a back block, and a front skin with the prize tray's opening.
+	_box(Vector3(0.94, 0.86, 0.67), Vector3(0, 0.43, -0.135), body, true, Vector3.ZERO, rig)
+	_box(Vector3(0.15, 0.86, 0.23), Vector3(-0.395, 0.43, 0.315), body, true, Vector3.ZERO, rig)
+	_box(Vector3(0.53, 0.86, 0.23), Vector3(0.205, 0.43, 0.315), body, true, Vector3.ZERO, rig)
+	_box(Vector3(0.26, 0.18, 0.23), Vector3(-0.19, 0.09, 0.315), body, true, Vector3.ZERO, rig)
+	_box(Vector3(0.26, 0.4, 0.23), Vector3(-0.19, 0.66, 0.315), body, true, Vector3.ZERO, rig)
+	_box(Vector3(0.26, 0.28, 0.02), Vector3(-0.19, 0.32, 0.21), dark, false, Vector3.ZERO, rig)
+	_box(Vector3(0.3, 0.025, 0.02), Vector3(-0.19, 0.47, 0.435), chrome, false, Vector3.ZERO, rig)
+	_label("PRIZE", Vector3(-0.19, 0.51, 0.432), 12, Color(1.0, 0.85, 0.4), rig)
+	_box(Vector3(0.96, 0.05, 0.92), Vector3(0, 0.025, -0.02), dark, false, Vector3.ZERO, rig)
+	_box(Vector3(0.96, 0.07, 0.92), Vector3(0, 0.62, -0.02), stripe, false, Vector3.ZERO, rig)
+	_coin_door(room, rig, Vector3(0.22, 0.3, 0.435), 1)
 	# Control ledge: joystick and the DROP button.
-	_box(Vector3(0.84, 0.06, 0.3), Vector3(0, 0.86, 0.26), _mat(room, Color(0.08, 0.06, 0.1)), false, Vector3(0.12, 0, 0), rig)
-	_box(Vector3(0.84, 0.16, 0.02), Vector3(0, 0.79, 0.41), stripe, false, Vector3.ZERO, rig)
-	_cyl(0.012, 0.07, Vector3(-0.18, 0.92, 0.28), chrome, rig)
-	office._ball(0.032, Vector3(-0.18, 0.96, 0.28), _mat(room, Color(0.9, 0.1, 0.15)), rig)
-	_cyl(0.055, 0.03, Vector3(0.17, 0.9, 0.27), _glow(room, Color(1.0, 0.2, 0.55)), rig)
-	_label("1 TOKEN", Vector3(0, 0.66, 0.19), 14, Color(1.0, 0.85, 0.4), rig)
-	# The glass case: chrome posts, tinted side panes with plush behind them.
-	for x in [-0.4, 0.4]:
-		for z in [0.16, -0.5]:
-			_box(Vector3(0.035, 0.86, 0.035), Vector3(x, 1.36, z), chrome, false, Vector3.ZERO, rig)
-	_box(Vector3(0.8, 0.86, 0.02), Vector3(0, 1.36, -0.5), _mat(room, Color(0.2, 0.06, 0.22), 6, title_col.darkened(0.5), 12.0), false, Vector3.ZERO, rig)
-	for x in [-0.4, 0.4]:
-		_box(Vector3(0.015, 0.86, 0.64), Vector3(x, 1.36, -0.17), glass, false, Vector3.ZERO, rig)
-	_box(Vector3(0.76, 0.02, 0.62), Vector3(0, 0.93, -0.17), _mat(room, Color(0.35, 0.1, 0.32), 6, title_col.darkened(0.3), 30.0), false, Vector3.ZERO, rig)
-	for side in [-1.0, 1.0]:
-		var plush := [Color(1.0, 0.85, 0.2), Color(0.62, 0.4, 0.22), Color(0.95, 0.45, 0.6), Color(0.45, 0.75, 1.0)]
-		for k in 5:
-			office._ball(0.06, Vector3(side * (0.24 + (k % 2) * 0.08), 0.99 + (k / 2) * 0.09, 0.05 - (k % 3) * 0.08), _mat(room, plush[(k + int(side)) % 4]), rig)
-	_bezel(room, rig, cy, Color(0.75, 0.75, 0.8))
-	_box(Vector3(0.84, 0.04, 0.72), Vector3(0, 1.8, -0.17), chrome, false, Vector3.ZERO, rig)
+	_box(Vector3(0.94, 0.05, 0.22), Vector3(0, 0.85, 0.53), _mat(room, Color(0.08, 0.06, 0.1)), false, Vector3(0.14, 0, 0), rig)
+	_box(Vector3(0.94, 0.12, 0.02), Vector3(0, 0.79, 0.64), stripe, false, Vector3.ZERO, rig)
+	_cyl(0.012, 0.07, Vector3(-0.2, 0.9, 0.53), chrome, rig)
+	office._ball(0.03, Vector3(-0.2, 0.94, 0.53), _mat(room, Color(0.9, 0.1, 0.15)), rig)
+	_cyl(0.05, 0.03, Vector3(0.2, 0.88, 0.53), _glow(room, Color(1.0, 0.2, 0.55)), rig)
+	_label("1 TOKEN A GRAB", Vector3(0, 0.79, 0.652), 12, Color(1.0, 0.85, 0.4), rig)
+	# Chrome posts at the corners of the glass, neon up the front two.
+	for x in [-0.455, 0.455]:
+		for z in [0.33, -0.455]:
+			_box(Vector3(0.035, 1.1, 0.035), Vector3(x, 1.41, z), chrome, false, Vector3.ZERO, rig)
+		_box(Vector3(0.012, 1.06, 0.012), Vector3(x * 0.985, 1.41, 0.352), _glow(room, title_col), false, Vector3.ZERO, rig)
+	_box(Vector3(0.96, 0.035, 0.92), Vector3(0, 0.875, -0.02), chrome, false, Vector3.ZERO, rig)
 	# Canopy: a lit sign box with chaser bulbs round its face.
-	_box(Vector3(0.84, 0.3, 0.5), Vector3(0, 1.97, -0.1), _glow(room, title_col * 0.12), false, Vector3.ZERO, rig)
-	_label(title, Vector3(0, 1.97, 0.16), 44, title_col.lightened(0.35), rig)
-	_bulbs(room, rig, Vector3(-0.38, 2.12, 0.16), Vector3(0.38, 2.12, 0.16), 9)
-	_bulbs(room, rig, Vector3(-0.38, 1.82, 0.16), Vector3(0.38, 1.82, 0.16), 9)
-	_box(Vector3(0.02, 0.86, 0.02), Vector3(-0.42, 1.36, 0.17), _glow(room, title_col), false, Vector3.ZERO, rig)
-	_box(Vector3(0.02, 0.86, 0.02), Vector3(0.42, 1.36, 0.17), _glow(room, title_col), false, Vector3.ZERO, rig)
+	_box(Vector3(0.96, 0.3, 0.92), Vector3(0, 2.11, -0.02), _glow(room, title_col * 0.14), false, Vector3.ZERO, rig)
+	_box(Vector3(0.98, 0.03, 0.94), Vector3(0, 1.96, -0.02), chrome, false, Vector3.ZERO, rig)
+	_label(title.replace("\n", " "), Vector3(0, 2.11, 0.445), 40, title_col.lightened(0.35), rig)
+	_bulbs(room, rig, Vector3(-0.44, 2.235, 0.45), Vector3(0.44, 2.235, 0.45), 11)
+	_bulbs(room, rig, Vector3(-0.44, 1.99, 0.45), Vector3(0.44, 1.99, 0.45), 11)
 
 
-## PUSH YOUR LUCK: a coin-pusher tower. Wide base with a coin tray full of
-## coins, a ledge with two coin slots, light columns either side of the
-## window, an arched marquee with a big gold coin on top.
-func _pusher_cabinet(room: String, rig: Node3D, body_col: Color, title: String, title_col: Color, cy: float) -> void:
+## PUSH YOUR LUCK around its glass case (scenes/ladder/pusher.gd builds the
+## playfield): a wide base with a coin tray, a chrome ledge with two coin
+## slots and the DROP button, light columns at the back, a tall backboard
+## marquee with a big gold coin on top.
+func _pusher_shell(room: String, rig: Node3D, body_col: Color, title: String, title_col: Color) -> void:
 	var body := _mat(room, body_col, 6, body_col.darkened(0.3), 30.0)
 	var chrome := _mat(room, Color(0.78, 0.8, 0.84), 6, Color(0.6, 0.62, 0.68), 90.0)
 	var dark := _mat(room, Color(0.03, 0.05, 0.06))
 	var gold := _mat(room, Color(0.95, 0.75, 0.25), 6, Color(0.8, 0.6, 0.15), 60.0, Color(0.15, 0.1, 0.0))
-	_box(Vector3(0.95, 0.85, 0.75), Vector3(0, 0.425, -0.2), body, true, Vector3.ZERO, rig)
-	_box(Vector3(0.97, 0.06, 0.77), Vector3(0, 0.03, -0.2), dark, false, Vector3.ZERO, rig)
+	_box(Vector3(1.0, 0.92, 0.93), Vector3(0, 0.46, -0.015), body, true, Vector3.ZERO, rig)
+	_box(Vector3(1.02, 0.05, 0.95), Vector3(0, 0.025, -0.015), dark, false, Vector3.ZERO, rig)
 	# Coin tray: a dark recess heaped with coins.
-	_box(Vector3(0.5, 0.12, 0.12), Vector3(0, 0.3, 0.2), chrome, false, Vector3.ZERO, rig)
-	_box(Vector3(0.44, 0.08, 0.1), Vector3(0, 0.33, 0.21), dark, false, Vector3.ZERO, rig)
+	_box(Vector3(0.5, 0.12, 0.1), Vector3(0, 0.3, 0.5), chrome, false, Vector3.ZERO, rig)
+	_box(Vector3(0.44, 0.08, 0.08), Vector3(0, 0.33, 0.51), dark, false, Vector3.ZERO, rig)
 	for i in 9:
-		_cyl(0.03, 0.008, Vector3(-0.17 + i * 0.043, 0.3 + (i % 3) * 0.008, 0.22 - (i % 2) * 0.03), gold, rig, Vector3(0.3, 0, 0.2 * (i % 3 - 1)), 8)
-	_label("TICKETS OUT", Vector3(0, 0.42, 0.19), 12, title_col, rig)
-	_coin_door(room, rig, Vector3(0.33, 0.6, 0.19), 1)
-	_coin_door(room, rig, Vector3(-0.33, 0.6, 0.19), 1)
-	# Ledge.
-	_box(Vector3(0.97, 0.05, 0.26), Vector3(0, 0.86, 0.26), chrome, false, Vector3(0.1, 0, 0), rig)
-	_cyl(0.05, 0.03, Vector3(0, 0.9, 0.28), _glow(room, Color(0.3, 1.0, 0.85)), rig)
-	_label("1 TOKEN = 5 COINS", Vector3(0, 0.76, 0.19), 12, Color(1.0, 0.85, 0.4), rig)
-	# The upper hood: window in the middle, light columns either side.
-	_box(Vector3(0.95, 0.9, 0.5), Vector3(0, 1.35, -0.1), body, false, Vector3.ZERO, rig)
-	_bezel(room, rig, cy, title_col)
+		_cyl(0.03, 0.008, Vector3(-0.17 + i * 0.043, 0.3 + (i % 3) * 0.008, 0.52 - (i % 2) * 0.02), gold, rig, Vector3(0.3, 0, 0.2 * (i % 3 - 1)), 8)
+	_label("TICKETS OUT", Vector3(0, 0.42, 0.457), 12, title_col, rig)
+	_coin_door(room, rig, Vector3(0.33, 0.6, 0.457), 1)
+	_coin_door(room, rig, Vector3(-0.33, 0.6, 0.457), 1)
+	# Ledge in front of the glass.
+	_box(Vector3(1.02, 0.05, 0.22), Vector3(0, 0.9, 0.55), chrome, false, Vector3(0.1, 0, 0), rig)
+	_cyl(0.05, 0.03, Vector3(0, 0.94, 0.56), _glow(room, Color(0.3, 1.0, 0.85)), rig)
+	_label("1 TOKEN = 5 COINS", Vector3(0, 0.8, 0.462), 12, Color(1.0, 0.85, 0.4), rig)
+	# Chrome frame round the glass case.
+	for x in [-0.485, 0.485]:
+		for z in [0.42, -0.5]:
+			_box(Vector3(0.03, 0.5, 0.03), Vector3(x, 1.17, z), chrome, false, Vector3.ZERO, rig)
+		_box(Vector3(0.03, 0.03, 0.95), Vector3(x, 1.42, -0.04), chrome, false, Vector3.ZERO, rig)
+	_box(Vector3(1.0, 0.03, 0.03), Vector3(0, 1.42, 0.42), chrome, false, Vector3.ZERO, rig)
+	_box(Vector3(1.0, 0.012, 0.012), Vector3(0, 1.4, 0.44), _glow(room, title_col), false, Vector3.ZERO, rig)
+	# Backboard: rises behind the case, light columns either side, marquee.
+	_box(Vector3(1.0, 0.95, 0.08), Vector3(0, 1.88, -0.54), body, false, Vector3.ZERO, rig)
 	for side in [-1.0, 1.0]:
-		_box(Vector3(0.18, 0.86, 0.04), Vector3(side * 0.37, 1.35, 0.16), dark, false, Vector3.ZERO, rig)
+		_box(Vector3(0.16, 0.85, 0.03), Vector3(side * 0.4, 1.88, -0.49), dark, false, Vector3.ZERO, rig)
 		for k in 7:
 			var c := Color(1.0, 0.85, 0.3) if k % 2 == 0 else title_col
-			_box(Vector3(0.12, 0.07, 0.015), Vector3(side * 0.37, 1.0 + k * 0.115, 0.185), _glow(room, c * (0.9 if k % 2 == 0 else 0.7)), false, Vector3.ZERO, rig)
-	# Arched marquee and a big coin on top.
-	_box(Vector3(0.97, 0.26, 0.5), Vector3(0, 1.93, -0.1), _glow(room, title_col * 0.12), false, Vector3.ZERO, rig)
-	_box(Vector3(0.7, 0.12, 0.46), Vector3(0, 2.11, -0.1), _glow(room, title_col * 0.25), false, Vector3.ZERO, rig)
-	_label(title, Vector3(0, 1.93, 0.16), 36, title_col.lightened(0.3), rig)
-	_bulbs(room, rig, Vector3(-0.45, 1.81, 0.16), Vector3(0.45, 1.81, 0.16), 11)
-	_cyl(0.16, 0.04, Vector3(0, 2.36, -0.1), gold, rig, Vector3(PI / 2, 0, 0), 14)
-	_label("$", Vector3(0, 2.36, -0.075), 64, Color(0.5, 0.3, 0.0), rig)
+			_box(Vector3(0.11, 0.07, 0.015), Vector3(side * 0.4, 1.53 + k * 0.115, -0.47), _glow(room, c * (0.9 if k % 2 == 0 else 0.7)), false, Vector3.ZERO, rig)
+	_box(Vector3(0.6, 0.34, 0.04), Vector3(0, 2.15, -0.49), _glow(room, title_col * 0.14), false, Vector3.ZERO, rig)
+	_label(title, Vector3(0, 2.15, -0.465), 30, title_col.lightened(0.3), rig)
+	_bulbs(room, rig, Vector3(-0.28, 1.96, -0.46), Vector3(0.28, 1.96, -0.46), 9)
+	_cyl(0.16, 0.04, Vector3(0, 2.52, -0.54), gold, rig, Vector3(PI / 2, 0, 0), 14)
+	_label("$", Vector3(0, 2.52, -0.515), 64, Color(0.5, 0.3, 0.0), rig)
 
 
-## FALL GUY: a classic upright video cabinet. Side panels in the familiar
-## profile (kick plate, coin door, jutting control panel, recessed screen,
-## overhanging marquee), coloured trim down the edges, a big FLING button.
-func _upright_cabinet(room: String, rig: Node3D, body_col: Color, title: String, title_col: Color, cy: float) -> void:
+## FALL GUY: a tall glass column floor to ceiling (scenes/ladder/ragdoll.gd
+## builds the inside: trampoline, bumpers, the bell, the dummy). A round
+## base with a control podium, chrome rings and struts, a lit cap.
+func _column_shell(room: String, rig: Node3D, body_col: Color, title: String, title_col: Color) -> void:
 	var body := _mat(room, body_col, 6, body_col.darkened(0.3), 30.0)
-	var side_art := _mat(room, body_col.darkened(0.2), 6, title_col.darkened(0.35), 10.0)
+	var chrome := _mat(room, Color(0.78, 0.78, 0.84), 6, Color(0.6, 0.6, 0.68), 90.0)
 	var dark := _mat(room, Color(0.04, 0.03, 0.03))
 	var trim := _glow(room, title_col * 0.8)
-	# Back and the two side panels, with their profile.
-	_box(Vector3(0.66, 1.95, 0.5), Vector3(0, 0.975, -0.25), body, true, Vector3.ZERO, rig)
-	for side in [-1.0, 1.0]:
-		var x: float = side * 0.35
-		_box(Vector3(0.04, 0.9, 0.7), Vector3(x, 0.45, -0.17), side_art, false, Vector3.ZERO, rig)
-		_box(Vector3(0.04, 0.82, 0.55), Vector3(x, 1.31, -0.1), side_art, false, Vector3.ZERO, rig)
-		_box(Vector3(0.04, 0.32, 0.7), Vector3(x, 1.9, -0.15), side_art, false, Vector3.ZERO, rig)
-		# T-moulding down the front edges.
-		_box(Vector3(0.045, 0.9, 0.02), Vector3(x, 0.45, 0.185), trim, false, Vector3.ZERO, rig)
-		_box(Vector3(0.045, 0.82, 0.02), Vector3(x, 1.31, 0.175), trim, false, Vector3.ZERO, rig)
-	# Kick plate and coin door.
-	_box(Vector3(0.66, 0.12, 0.02), Vector3(0, 0.06, 0.18), dark, false, Vector3.ZERO, rig)
-	_box(Vector3(0.66, 0.72, 0.02), Vector3(0, 0.48, 0.17), body, false, Vector3.ZERO, rig)
-	_coin_door(room, rig, Vector3(0, 0.5, 0.185), 2)
-	# Control panel: jutting out, tilted, a joystick, two small buttons and
-	# the big FLING button.
+	# Round base (a box keeps you out of it).
+	_cyl(0.52, 0.8, Vector3(0, 0.4, 0), body, rig, Vector3.ZERO, 16)
+	_box(Vector3(0.9, 0.8, 0.9), Vector3(0, 0.4, 0), body, true, Vector3.ZERO, rig).visible = false
+	_cyl(0.53, 0.06, Vector3(0, 0.03, 0), dark, rig, Vector3.ZERO, 16)
+	_cyl(0.535, 0.04, Vector3(0, 0.6, 0), trim, rig, Vector3.ZERO, 16)
+	_cyl(0.5, 0.045, Vector3(0, 0.82, 0), chrome, rig, Vector3.ZERO, 16)
+	_coin_door(room, rig, Vector3(0, 0.3, 0.52), 2)
+	# Control podium out front: joystick, two buttons, the big BOUNCE button.
 	var panel := _mat(room, Color(0.12, 0.1, 0.09), 6, Color(0.2, 0.17, 0.14), 40.0)
-	_box(Vector3(0.7, 0.07, 0.36), Vector3(0, 0.84, 0.27), panel, false, Vector3(0.2, 0, 0), rig)
-	_box(Vector3(0.7, 0.14, 0.02), Vector3(0, 0.76, 0.45), trim, false, Vector3.ZERO, rig)
-	_cyl(0.012, 0.07, Vector3(-0.2, 0.9, 0.3), _mat(room, Color(0.75, 0.75, 0.8)), rig)
-	office._ball(0.03, Vector3(-0.2, 0.94, 0.3), _mat(room, Color(0.9, 0.15, 0.12)), rig)
-	for i in 2:
-		_cyl(0.025, 0.02, Vector3(-0.02 + i * 0.08, 0.885, 0.28), _mat(room, [Color(0.95, 0.85, 0.2), Color(0.3, 0.55, 0.95)][i]), rig)
-	_cyl(0.055, 0.03, Vector3(0.2, 0.89, 0.28), _glow(room, Color(1.0, 0.35, 0.1)), rig)
-	_label("FLING", Vector3(0.2, 0.78, 0.465), 10, Color(1.0, 0.85, 0.5), rig)
-	_label("1 TOKEN", Vector3(0, 0.72, 0.19), 14, Color(1.0, 0.85, 0.4), rig)
-	# Screen, recessed in its bezel, with a little line of art under it.
-	_box(Vector3(0.66, 0.82, 0.02), Vector3(0, 1.31, 0.145), dark, false, Vector3.ZERO, rig)
-	_bezel(room, rig, cy, title_col)
-	# Overhanging marquee, angled down at you.
-	_box(Vector3(0.7, 0.28, 0.08), Vector3(0, 1.88, 0.1), _glow(room, title_col * 0.15), false, Vector3(-0.15, 0, 0), rig)
-	_label(title, Vector3(0, 1.9, 0.145), 40, title_col.lightened(0.3), rig, Vector3(-0.15, 0, 0))
-	_label("BERNIE'S STRESS RELIEF", Vector3(0, 1.78, 0.16), 8, Color(1, 1, 1, 0.8), rig, Vector3(-0.15, 0, 0))
-	_box(Vector3(0.7, 0.04, 0.6), Vector3(0, 2.05, -0.15), dark, false, Vector3.ZERO, rig)
+	_box(Vector3(0.6, 0.72, 0.2), Vector3(0, 0.36, 0.52), body, true, Vector3.ZERO, rig)
+	_box(Vector3(0.64, 0.06, 0.28), Vector3(0, 0.74, 0.55), panel, false, Vector3(0.2, 0, 0), rig)
+	_box(Vector3(0.64, 0.1, 0.02), Vector3(0, 0.66, 0.69), trim, false, Vector3.ZERO, rig)
+	_cyl(0.012, 0.07, Vector3(-0.18, 0.8, 0.56), _mat(room, Color(0.75, 0.75, 0.8)), rig)
+	office._ball(0.03, Vector3(-0.18, 0.84, 0.56), _mat(room, Color(0.9, 0.15, 0.12)), rig)
+	_cyl(0.055, 0.03, Vector3(0.16, 0.79, 0.55), _glow(room, Color(1.0, 0.35, 0.1)), rig)
+	_label("BOUNCE", Vector3(0.16, 0.66, 0.702), 10, Color(1.0, 0.85, 0.5), rig)
+	_label("1 TOKEN", Vector3(-0.12, 0.66, 0.702), 10, Color(1.0, 0.85, 0.4), rig)
+	# Struts outside the glass, rings top and bottom.
+	for i in 4:
+		var a := PI / 4 + i * PI / 2
+		_box(Vector3(0.03, 1.72, 0.03), Vector3(sin(a) * 0.49, 1.68, cos(a) * 0.49), chrome, false, Vector3(0, a, 0), rig)
+	_cyl(0.5, 0.04, Vector3(0, 2.54, 0), chrome, rig, Vector3.ZERO, 16)
+	# The cap: a drum with the marquee wrapped round its front.
+	_cyl(0.52, 0.22, Vector3(0, 2.67, 0), _glow(room, title_col * 0.16), rig, Vector3.ZERO, 16)
+	_cyl(0.53, 0.025, Vector3(0, 2.565, 0), trim, rig, Vector3.ZERO, 16)
+	_label(title.replace("\n", " "), Vector3(0, 2.68, 0.535), 34, title_col.lightened(0.3), rig)
+	_label("BERNIE'S STRESS RELIEF", Vector3(0, 2.6, 0.54), 8, Color(1, 1, 1, 0.8), rig)
+	_bulbs(room, rig, Vector3(-0.3, 2.765, 0.47), Vector3(0.3, 2.765, 0.47), 7)
 
 
-func _machine(id: String, script: String, room: String, screen: Node3D, size: Vector2) -> void:
+func _machine(id: String, script: String, room: String, screen: Node3D, size: Vector2, cage: Node3D = null) -> void:
 	var vp := SubViewport.new()
 	vp.size = MACHINE_PX
 	vp.disable_3d = true
+	vp.transparent_bg = cage != null
 	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 	office.add_child(vp)
 	office._view_bus[vp] = office._make_bus("Ladder")
 	var m: Control = load(script).new()
 	m.hub = self
+	m.cage = cage
 	vp.add_child(m)
-	var pc = office._add_computer(screen, size, vp, MACHINE_PX)
-	_machines[id] = {"vp": vp, "node": m, "pc": pc, "room": room, "active": false}
+	var pc = office._add_computer(screen, size, vp, MACHINE_PX, false, null, cage != null)
+	_machines[id] = {"vp": vp, "node": m, "pc": pc, "room": room, "active": false, "cage": cage}
 
 
 ## A standing (or seated) coworker built from PS1 boxes. Returns their root.
@@ -1249,6 +1247,9 @@ func _update_rooms(force: bool) -> void:
 		var here: bool = m.room == _room or (m.room == "archive" and _room == "arcade") or (m.room == "arcade" and _room == "archive")
 		m.vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if here else (SubViewport.UPDATE_ONCE if force else SubViewport.UPDATE_DISABLED)
 		m.node.process_mode = Node.PROCESS_MODE_INHERIT if here else Node.PROCESS_MODE_DISABLED
+		# A cage's physics stops with it (its bodies leave the physics space).
+		if m.cage:
+			m.cage.process_mode = m.node.process_mode
 
 
 ## Look Busy: the boss walks in through the office door even while it's

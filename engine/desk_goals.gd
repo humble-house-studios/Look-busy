@@ -42,8 +42,8 @@ const DESKS := {
 		["beat:pusher", 1, "PUSH OFF THE GOLD JACKPOT CHIP"]]},
 	"ragdoll": {"name": "FALL GUY", "tiers": [
 		["best:ragdoll", 1, "SCORE ANY POINTS"],
-		["best:ragdoll", 22, "SCORE 450 IN ONE FLING"],
-		["beat:ragdoll", 1, "SCORE 900 IN ONE FLING"]]},
+		["best:ragdoll", 22, "SCORE 450 IN ONE ROUND"],
+		["beat:ragdoll", 1, "SCORE 900 IN ONE ROUND"]]},
 }
 
 ## The desks in the order they're met.

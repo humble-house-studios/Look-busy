@@ -198,13 +198,28 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   `_add_computer()`; `hub` is the ladder node. Rules in `engine/ladder_state.gd`
   (`user://ladder.cfg`), `engine/coworkers.gd` + `data/coworker_lines.gd`
   (`user://coworkers.cfg`), `arcade_rules.gd`, `market.gd`, `pitch.gd`,
-  `final_set.gd`, tested in `tests/test_ladder.gd`. The claw machine, coin
-  pusher, Fall Guy ragdoll and the corner-office golf (CORNER LINKS, 3 holes)
-  are real 3D physics games: each builds a little world with
-  `scenes/ladder/view3d.gd` (own World3D and physics, drawn at 1/3 size with
-  chunky pixels; `retro3d.gdshader` per-vertex lights, fog, dither;
-  `retro_post.gdshader` grain/scanlines). Fall Guy is the grimy, flickering
-  corridor look. `tools/machine_shot.gd` screenshots one machine on its own. Rooms get their own lights
+  `final_set.gd`, tested in `tests/test_ladder.gd`. **The arcade cabinets
+  are glass cages, not screens:** the claw machine, coin pusher and Fall Guy
+  are built straight into the arcade's 3D world (`scenes/ladder/cage3d.gd`:
+  the machine script builds its cage inside the cabinet shell from
+  `ladder.gd` `_claw_shell()` / `_pusher_shell()` / `_column_shell()`; own
+  physics layer 4 so prizes never touch the player; `retro3d.gdshader` lit
+  by the cage's own neon, `glass.gdshader` panes), so you see the prizes,
+  coins and the dummy from across the room. Each machine's `SEAT` is the rect
+  the seated camera frames; its 720×1280 Control is only the controls,
+  transparent, laid over the glass while seated (`_add_computer(..., overlay)`,
+  `Computer.overlay`). The claw is real: kinematic prongs close until they
+  touch a prize (tips scraping the floor lift the head so it scoops), the
+  prize is held by contact alone, weak grabs go slack partway up; won prizes
+  roll into the tray in the base. Fall Guy is a floor-to-ceiling glass column:
+  a ragdoll on a trampoline, BOUNCE as he lands (nearer the touchdown =
+  harder), lean into the bumpers, ring the bell. `godot --headless --fixed-fps
+  60 -s res://tools/cage_check.gd` plays all three and prints PASS/FAIL
+  (strong grabs land, coins pay, the dummy stays in the glass and in one
+  piece); with a display and `OUT=` it saves seat-view shots. The
+  corner-office golf (CORNER LINKS, 3 holes) still builds its own little world
+  on its screen with `scenes/ladder/view3d.gd` (`retro_post.gdshader`
+  grain/scanlines); `tools/machine_shot.gd` shoots it on its own. Rooms get their own lights
   through `ps1.gdshader`'s `room_*` uniforms. Rooms out of reach hide and their
   machines pause. Screenshots: `tools/ladder_shot.gd`; a scripted walkthrough of
   every door, screen and coworker: `godot --headless -s res://tools/ladder_walk.gd`

@@ -58,7 +58,7 @@ paycheck → tokens → tickets → portfolio → board votes → material.
 
 | Room | What you play | How you beat it |
 |---|---|---|
-| Arcade (the break room) | Claw King, Push Your Luck (coin pusher), Fall Guy (fling the Dale dummy), prize counter | Buy the DOOR KEY (300 tickets) |
+| Arcade (the break room) | Glass-cage cabinets with real physics: Claw King, Push Your Luck (coin pusher), Fall Guy (bounce the Dale dummy up a glass column), prize counter | Buy the DOOR KEY (300 tickets) |
 | Archive (basement, secret) | Shelved games with notes about the founder | Ray's key opens it; finding it counts for the true ending |
 | Trading floor | Five stocks from your world on a 90s ticker; RUMORS come before NEWS | Double your cashed-out tickets by day 8 |
 | Boardroom | Dale is waiting: he's the founder (the reveal). Then answer each board member's objection with a matching card (YES, AND is wild) | Hear Dale out, then 3 yeses of 5 |

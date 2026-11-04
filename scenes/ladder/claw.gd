@@ -1,91 +1,132 @@
 extends "res://scenes/ladder/machine.gd"
-## CLAW KING: a real 3D claw machine (scenes/ladder/view3d.gd) under pink and
-## cyan neon. Steer the claw left/right and back/front with the arrows (a red
-## laser and a shadow show where it'll land), DROP (1 token), and it grabs
-## whatever is under it. Every fourth grab is full strength
-## (ArcadeRules.CLAW_STRONG_EVERY); weaker grabs slip partway up. Prizes
-## carried to the chute (front left) pay tickets. The TOP-SHELF STAR beats the
-## machine. Gloria's Eye (her perk) lights the claw green at full strength.
-## On a controller the claw drives straight from the stick or D-pad (the pad
-## cursor stands aside, `hold`) and A drops; arrow keys + Enter/Space too.
+## CLAW KING: a real claw machine in a glass cage in the arcade
+## (scenes/ladder/cage3d.gd: you can see the prizes from across the room).
+## Steer the claw (on-screen arrows, stick, D-pad, arrow keys/WASD), DROP
+## (1 token): it lowers until it bumps the pile, closes its three prongs until
+## they touch something, lifts, and always carries back to the chute and
+## opens. Nothing is faked: the prongs are kinematic bodies and the prize is
+## held only by where they closed, so a grab on the edge of a duck tips it out.
+## Every fourth grab is full strength (ArcadeRules.CLAW_STRONG_EVERY); on the
+## others the claw goes slack partway up (CLAW_WEAK_HOLD) and what it holds
+## usually slips. Prizes that drop down the chute pay tickets and roll out
+## into the tray in the cabinet's front; the TOP-SHELF STAR beats the machine.
+## Gloria's Eye (her perk) lights the claw head green at full strength.
 
-const VIEW_AT := Vector2(0, 150)
-const VIEW := Vector2(720, 850)
-## The glass box, metres: x left/right, z back/front, floor at y 0.
-const HALF := Vector2(0.8, 0.6)
-const CHUTE := Rect2(-0.8, 0.18, 0.42, 0.42)
-const RAIL_Y := 1.25
-const SPEED := 0.55
-const DROP_SPEED := 0.75
-const REACH := 0.17
-const KEEP := 13
+## The rect (cabinet metres) the seated camera frames and these controls are
+## laid over: centre, size (9:16 like the controls), tilt back (looks down in).
+const SEAT := {"at": Vector3(0, 1.42, 0.7), "size": Vector2(1.0, 1.7778), "tilt": -0.45}
+## The cage inside, cabinet metres: x across, z back (-) to the glass (+).
+const X0 := -0.43
+const X1 := 0.43
+const Z0 := -0.44
+const Z1 := 0.31
+const FLOOR := 0.9
+const TOP := 1.94
+## The chute: the front-left corner of the floor is a hole (x, z, w, d).
+const CHUTE := Rect2(-0.43, 0.07, 0.23, 0.24)
+## Where a won prize rolls out: the tray behind the little door in the base.
+const TRAY := Vector3(-0.19, 0.36, 0.33)
+const RAIL_Y := 1.88
+const HEAD_Y := 1.74
+const HEAD_R := 0.036
+const HEAD_H := 0.05
+const SPEED := 0.3
+const ACCEL := 1.6
+const DROP_SPEED := 0.42
+const RISE_SPEED := 0.3
+## Prong angles (radians, + = tips swing in), finger and tip lengths.
+const OPEN := -1.0
+const SHUT := 0.34
+const SLACK := 0.32
+const CLOSE_RATE := 1.4
+const HINGE_R := 0.03
+const FINGER := 0.12
+const TIP := 0.06
+const CURL := 0.8
+## How far the head may ride up on its prongs when they scrape the floor.
+const RIDE := 0.08
+const KEEP := 14
 const STAR_KEEP := 2
-const OPEN := 0.75
-const SHUT := 0.12
 
 enum S { IDLE, DROP, CLOSE, RISE, CARRY, OPEN_UP }
 
 var _state := S.IDLE
-var _claw := Vector3(0.25, RAIL_Y, -0.1)
+## Where the carriage is (x, z) and how fast it's going.
+var _at := Vector2(0.15, -0.05)
+var _vel := Vector2.ZERO
+var _head_y := HEAD_Y
+## The head's swing on its cable (x, z offset from under the carriage).
+var _swing := Vector2.ZERO
+var _swing_v := Vector2.ZERO
+## Each prong's angle: they close separately, each stopping where it meets
+## a prize.
+var _angles: Array[float] = [OPEN, OPEN, OPEN]
+var _ride := 0.0
+var _stuck: Array = [[], [], []]
+var _slack := false
+var _strong := false
+var _grabs := 0
+var _timer := 0.0
+var _rise_from := 0.0
+## The prize the claw lifted off the pile (for the IT SLIPPED call), if any.
+var _lifted: RigidBody3D
 var _dir := Vector2.ZERO
 var _stick := Vector2.ZERO
 var _dpad := {}
 var _keys := {}
 var _pad_told := false
-var _held: RigidBody3D
-var _strong := false
-var _grabs := 0
-var _close_t := 0.0
-var _rise_from := 0.0
-var _open := OPEN
 var _prizes: Array[RigidBody3D] = []
-var _view
+var _tray: Array = []
+var _v
+var _head: AnimatableBody3D
+var _prongs: Array[AnimatableBody3D] = []
+var _prong_shapes: Array = []
+var _claw_rids: Array[RID] = []
 var _bridge: Node3D
 var _carriage: Node3D
 var _cable: MeshInstance3D
-var _head: Node3D
-var _prongs: Array[Node3D] = []
 var _laser: MeshInstance3D
 var _shadow: MeshInstance3D
 var _head_mat: ShaderMaterial
+var _chute_mat: ShaderMaterial
 var _bulbs: Array[ShaderMaterial] = []
 var _grip: Label
 var _drop: Button
 var _rng := RandomNumberGenerator.new()
 var _t := 0.0
+var _flash := 0.0
 
 
 func _ready() -> void:
 	super._ready()
 	_rng.randomize()
-	frame("CLAW KING", Color(0.05, 0.02, 0.09), Color(1.0, 0.4, 0.75))
-	_view = preload("res://scenes/ladder/view3d.gd").new()
-	add_child(_view)
-	_view.setup(VIEW_AT, VIEW, 3, {
-		"sky": Color(0.05, 0.02, 0.09), "ambient": Color(0.28, 0.2, 0.36),
-		"fog_col": Color(0.08, 0.03, 0.12), "fog_near": 3.0, "fog_far": 6.5,
-		"grain": 0.05, "vignette": 0.55, "scan": 0.07, "tint": Color(1.0, 0.3, 0.7, 0.04),
-	})
-	_view.add_post(self)
-	_view.set_light(0, Vector3(-0.6, 1.5, 0.1), Color(1.0, 0.35, 0.75), 2.4, 1.1)
-	_view.set_light(1, Vector3(0.7, 1.5, -0.2), Color(0.3, 0.9, 1.0), 2.4, 1.0)
-	_view.set_light(2, Vector3(0.0, 1.6, 1.4), Color(1.0, 0.95, 0.85), 3.2, 0.7)
-	_view.set_light(3, Vector3(-0.6, 0.2, 0.4), Color(1.0, 0.8, 0.2), 0.9, 0.8)
-	_view.cam.position = Vector3(0.15, 1.75, 2.45)
-	_view.cam.look_at(Vector3(0.0, 0.62, 0.0))
-	_view.cam.fov = 44.0
-	_build_box()
-	_build_claw()
-	for i in KEEP:
-		_spawn(_kind_for(i), _random_spot(0.2 + i * 0.09))
-	_grip = label("", 22, Color(0.6, 1.0, 0.7))
-	_grip.position = Vector2(0, 156)
+	frame("CLAW KING", Color.TRANSPARENT, Color(1.0, 0.4, 0.75))
+	_grip = label("", 20, Color(0.6, 1.0, 0.7))
+	_grip.add_theme_color_override("font_outline_color", Color.BLACK)
+	_grip.add_theme_constant_override("outline_size", 10)
+	_grip.position = Vector2(0, 112)
 	_grip.size = Vector2(W, 34)
 	add_child(_grip)
 	_controls()
-	_update_grip()
 	pad.hold = true
 	pad.guide = [["L", "Move the claw"], ["DPAD", "Move the claw"], ["A", "Drop"]]
+	if cage:
+		_build()
+	_update_grip()
+
+
+func _build() -> void:
+	_v = cage
+	_v.setup({"ambient": Color(0.3, 0.22, 0.38), "fog_col": Color(0.12, 0.06, 0.18)})
+	_v.set_light(0, Vector3(-0.3, TOP - 0.05, -0.1), Color(1.0, 0.35, 0.75), 1.3, 1.1)
+	_v.set_light(1, Vector3(0.32, TOP - 0.05, -0.15), Color(0.3, 0.9, 1.0), 1.3, 1.0)
+	_v.set_light(2, Vector3(0.0, TOP - 0.02, 0.25), Color(1.0, 0.95, 0.85), 1.4, 0.8)
+	_v.set_light(3, Vector3(CHUTE.get_center().x, FLOOR - 0.02, CHUTE.get_center().y), Color(1.0, 0.8, 0.2), 0.45, 0.9)
+	_v.set_light(4, TRAY + Vector3(0, 0.12, 0.05), Color(1.0, 0.8, 0.4), 0.35, 0.8)
+	_build_box()
+	_build_claw()
+	for i in KEEP:
+		_spawn(_kind_for(i), _random_spot(FLOOR + 0.12 + i * 0.07))
 
 
 func _kind_for(i: int) -> String:
@@ -95,151 +136,203 @@ func _kind_for(i: int) -> String:
 
 
 func _random_spot(y: float) -> Vector3:
-	return Vector3(_rng.randf_range(CHUTE.end.x + 0.15, HALF.x - 0.15), y, _rng.randf_range(-HALF.y + 0.15, HALF.y - 0.15))
+	for i in 20:
+		var p := Vector3(_rng.randf_range(X0 + 0.09, X1 - 0.09), y, _rng.randf_range(Z0 + 0.09, Z1 - 0.09))
+		if p.x > CHUTE.end.x + 0.1 or p.z < CHUTE.position.y - 0.1:
+			return p
+	return Vector3(0.2, y, -0.2)
 
 
 # ---------------------------------------------------------------- building
 
 func _build_box() -> void:
-	var v = _view
-	var plush: ShaderMaterial = v.mat(Color(0.55, 0.15, 0.45), {"pattern": 3, "col2": Color(0.8, 0.3, 0.65), "texel": 30.0})
-	var wall: ShaderMaterial = v.mat(Color(0.12, 0.05, 0.2), {"pattern": 4, "col2": Color(0.9, 0.3, 0.8), "texel": 5.0})
-	var side: ShaderMaterial = v.mat(Color(0.1, 0.04, 0.16))
+	var v = _v
+	var plush: ShaderMaterial = v.mat(Color(0.55, 0.15, 0.45), {"pattern": 3, "col2": Color(0.8, 0.3, 0.65), "texel": 60.0})
+	var wall: ShaderMaterial = v.mat(Color(0.12, 0.05, 0.2), {"pattern": 4, "col2": Color(0.9, 0.3, 0.8), "texel": 10.0})
 	var chrome: ShaderMaterial = v.mat(Color(0.7, 0.7, 0.78), {"shine": 1.4})
-	var hazard: ShaderMaterial = v.mat(Color(1.0, 0.8, 0.1), {"pattern": 1, "col2": Color(0.08, 0.06, 0.04), "texel": 14.0})
-	# Floor with the chute cut out of its front-left corner.
-	var right_w := HALF.x - CHUTE.end.x
-	v.solid(Vector3(right_w, 0.1, HALF.y * 2), Vector3(CHUTE.end.x + right_w * 0.5, -0.05, 0), plush, null, Vector3.ZERO, 0.05, 0.9)
-	var back_d := CHUTE.position.y + HALF.y
-	v.solid(Vector3(CHUTE.size.x, 0.1, back_d), Vector3(CHUTE.get_center().x, -0.05, -HALF.y + back_d * 0.5), plush, null, Vector3.ZERO, 0.05, 0.9)
-	# Walls: back, sides; the front is glass (invisible, still solid).
-	v.solid(Vector3(HALF.x * 2 + 0.2, 1.6, 0.1), Vector3(0, 0.75, -HALF.y - 0.05), wall)
-	v.solid(Vector3(0.1, 1.6, HALF.y * 2), Vector3(-HALF.x - 0.05, 0.75, 0), side)
-	v.solid(Vector3(0.1, 1.6, HALF.y * 2), Vector3(HALF.x + 0.05, 0.75, 0), side)
-	v.solid(Vector3(HALF.x * 2, 1.6, 0.04), Vector3(0, 0.75, HALF.y + 0.02), null)
-	# The chute: a low hazard-striped lip so prizes don't wander in, and a
-	# glowing pit below.
-	v.solid(Vector3(0.03, 0.14, CHUTE.size.y), Vector3(CHUTE.end.x + 0.015, 0.07, CHUTE.get_center().y), hazard)
-	v.solid(Vector3(CHUTE.size.x, 0.14, 0.03), Vector3(CHUTE.get_center().x, 0.07, CHUTE.position.y - 0.015), hazard)
-	v.box(Vector3(CHUTE.size.x, 0.02, CHUTE.size.y), Vector3(CHUTE.get_center().x, -0.6, CHUTE.get_center().y), v.glow(Color(0.9, 0.6, 0.1)))
-	v.text("PRIZE", Vector3(CHUTE.get_center().x, 0.17, CHUTE.end.y - 0.01), 16, Color(1.0, 0.85, 0.3), null, Vector3(-0.5, 0, 0))
-	# Neon on the glass edges, and a marquee on the back wall.
+	var hazard: ShaderMaterial = v.mat(Color(1.0, 0.8, 0.1), {"pattern": 1, "col2": Color(0.08, 0.06, 0.04), "texel": 28.0})
+	var glass: ShaderMaterial = v.glass_mat()
+	var w := X1 - X0
+	var d := Z1 - Z0
+	# The floor (thick, so nothing falls through), with the chute cut out.
+	var right_w := X1 - CHUTE.end.x
+	v.solid(Vector3(right_w, 0.2, d), Vector3(CHUTE.end.x + right_w * 0.5, FLOOR - 0.1, (Z0 + Z1) * 0.5), plush, null, Vector3.ZERO, 0.05, 0.9)
+	var back_d := CHUTE.position.y - Z0
+	v.solid(Vector3(CHUTE.size.x, 0.2, back_d), Vector3(CHUTE.get_center().x, FLOOR - 0.1, Z0 + back_d * 0.5), plush, null, Vector3.ZERO, 0.05, 0.9)
+	# The chute: a hazard-striped lip, a glowing well under it.
+	v.solid(Vector3(0.02, 0.05, CHUTE.size.y), Vector3(CHUTE.end.x + 0.01, FLOOR + 0.025, CHUTE.get_center().y), hazard)
+	v.solid(Vector3(CHUTE.size.x + 0.02, 0.05, 0.02), Vector3(CHUTE.get_center().x + 0.01, FLOOR + 0.025, CHUTE.position.y - 0.01), hazard)
+	_chute_mat = v.glow(Color(0.9, 0.6, 0.1))
+	v.box(Vector3(CHUTE.size.x, 0.004, CHUTE.size.y), Vector3(CHUTE.get_center().x, FLOOR - 0.035, CHUTE.get_center().y), _chute_mat)
+	v.text("PRIZE", Vector3(CHUTE.get_center().x, FLOOR + 0.026, CHUTE.end.y + 0.001), 14, Color(1.0, 0.85, 0.3))
+	# Back wall (art), ceiling, and the glass: sides and front. Colliders are
+	# thick (outward), the panes you see are thin.
+	v.solid(Vector3(w + 0.1, TOP - FLOOR + 0.1, 0.2), Vector3(0, (FLOOR + TOP) * 0.5, Z0 - 0.1), wall)
+	v.solid(Vector3(w + 0.1, 0.2, d + 0.1), Vector3(0, TOP + 0.1, (Z0 + Z1) * 0.5), v.mat(Color(0.08, 0.04, 0.12)))
+	for s in [-1.0, 1.0]:
+		var x: float = X1 if s > 0 else X0
+		v.solid(Vector3(0.2, TOP - FLOOR, d), Vector3(x + s * 0.11, (FLOOR + TOP) * 0.5, (Z0 + Z1) * 0.5), null)
+		v.box(Vector3(0.006, TOP - FLOOR, d + 0.01), Vector3(x + s * 0.012, (FLOOR + TOP) * 0.5, (Z0 + Z1) * 0.5), glass)
+	v.solid(Vector3(w + 0.1, TOP - FLOOR, 0.2), Vector3(0, (FLOOR + TOP) * 0.5, Z1 + 0.11), null)
+	v.box(Vector3(w + 0.03, TOP - FLOOR, 0.006), Vector3(0, (FLOOR + TOP) * 0.5, Z1 + 0.012), glass)
+	# Back wall art: the marquee in neon, a slogan.
+	v.text("CLAW KING", Vector3(0.0, 1.62, Z0 + 0.003), 40, Color(1.0, 0.45, 0.85))
+	v.text("EVERY GRAB IS A GAMBLE", Vector3(0.0, 1.53, Z0 + 0.003), 12, Color(0.4, 1.0, 0.95))
 	var pink: ShaderMaterial = v.glow(Color(1.0, 0.35, 0.75))
 	var cyan: ShaderMaterial = v.glow(Color(0.3, 0.95, 1.0))
-	for x in [-HALF.x, HALF.x]:
-		v.box(Vector3(0.025, 1.5, 0.025), Vector3(x, 0.75, HALF.y), pink)
-	v.box(Vector3(HALF.x * 2, 0.025, 0.025), Vector3(0, 1.5, HALF.y), cyan)
-	v.box(Vector3(HALF.x * 2, 0.025, 0.025), Vector3(0, 0.0, HALF.y + 0.01), cyan)
-	v.text("CLAW KING", Vector3(0.1, 1.05, -HALF.y + 0.005), 48, Color(1.0, 0.45, 0.85))
-	v.text("EVERY GRAB IS A GAMBLE", Vector3(0.1, 0.9, -HALF.y + 0.005), 14, Color(0.4, 1.0, 0.95))
-	for i in 10:
+	v.box(Vector3(w - 0.04, 0.012, 0.012), Vector3(0, 1.72, Z0 + 0.01), pink)
+	v.box(Vector3(w - 0.04, 0.012, 0.012), Vector3(0, 1.46, Z0 + 0.01), cyan)
+	# Light strips in the ceiling, chaser bulbs along the top of the glass.
+	v.box(Vector3(w - 0.1, 0.01, 0.03), Vector3(0, TOP - 0.004, 0.22), v.glow(Color(1.0, 0.95, 0.85)))
+	for x in [X0 + 0.06, X1 - 0.06]:
+		v.box(Vector3(0.03, 0.01, d - 0.1), Vector3(x, TOP - 0.004, (Z0 + Z1) * 0.5), pink if x < 0 else cyan)
+	for i in 11:
 		var b: ShaderMaterial = v.glow(Color(1.0, 0.9, 0.4))
 		_bulbs.append(b)
-		v.ball(0.025, Vector3(-HALF.x + 0.08 + i * 0.16, 1.55, HALF.y + 0.02), b, null, 6)
+		v.ball(0.012, Vector3(X0 + 0.04 + i * (w - 0.08) / 10.0, TOP - 0.03, Z1 - 0.005), b, null, 6)
 	# Gantry rails along the top.
-	for z in [-HALF.y + 0.04, HALF.y - 0.04]:
-		v.box(Vector3(HALF.x * 2, 0.04, 0.04), Vector3(0, RAIL_Y + 0.12, z), chrome)
+	for z in [Z0 + 0.03, Z1 - 0.03]:
+		v.box(Vector3(w, 0.022, 0.022), Vector3(0, RAIL_Y, z), chrome)
+	# The prize tray in the base: a floor, walls and a little glass door.
+	var tray_mat: ShaderMaterial = v.mat(Color(0.25, 0.08, 0.22), {"pattern": 3, "col2": Color(0.4, 0.12, 0.35), "texel": 40.0})
+	v.solid(Vector3(0.26, 0.04, 0.23), Vector3(TRAY.x, 0.16, 0.315), tray_mat)
+	v.solid(Vector3(0.26, 0.3, 0.04), Vector3(TRAY.x, 0.32, 0.185), null)
+	for s in [-1.0, 1.0]:
+		v.solid(Vector3(0.04, 0.3, 0.23), Vector3(TRAY.x + s * 0.15, 0.32, 0.315), null)
+	v.solid(Vector3(0.26, 0.3, 0.04), Vector3(TRAY.x, 0.32, 0.452), null)
+	v.box(Vector3(0.26, 0.27, 0.004), Vector3(TRAY.x, 0.32, 0.433), glass)
 
 
+## The claw: a bridge across the rails, a carriage riding it, a cable, and
+## the head with three prongs. The head and prongs are kinematic bodies: they
+## shove prizes, and whatever they close around is carried by contact alone.
 func _build_claw() -> void:
-	var v = _view
+	var v = _v
 	var chrome: ShaderMaterial = v.mat(Color(0.75, 0.75, 0.82), {"shine": 1.6})
 	var dark: ShaderMaterial = v.mat(Color(0.2, 0.2, 0.25), {"shine": 0.6})
 	_head_mat = v.mat(Color(0.8, 0.8, 0.86), {"shine": 1.6})
 	_bridge = Node3D.new()
-	v.root.add_child(_bridge)
-	v.box(Vector3(0.05, 0.05, HALF.y * 2), Vector3(0, RAIL_Y + 0.12, 0), chrome, _bridge)
+	v.add_child(_bridge)
+	v.box(Vector3(0.026, 0.026, Z1 - Z0), Vector3(0, RAIL_Y, (Z0 + Z1) * 0.5), chrome, _bridge)
 	_carriage = Node3D.new()
 	_bridge.add_child(_carriage)
-	v.box(Vector3(0.13, 0.08, 0.13), Vector3(0, RAIL_Y + 0.07, 0), dark, _carriage)
-	_cable = v.box(Vector3(0.012, 1.0, 0.012), Vector3.ZERO, chrome)
-	_head = Node3D.new()
-	v.root.add_child(_head)
-	v.cyl(0.055, 0.07, 0.08, Vector3(0, 0.0, 0), _head_mat, _head)
+	v.box(Vector3(0.07, 0.04, 0.07), Vector3(0, RAIL_Y - 0.02, 0), dark, _carriage)
+	_cable = v.box(Vector3(0.005, 1.0, 0.005), Vector3.ZERO, chrome)
+	_head = AnimatableBody3D.new()
+	_head.sync_to_physics = false
+	v._layers(_head)
+	var hs := CylinderShape3D.new()
+	hs.radius = HEAD_R
+	hs.height = HEAD_H
+	v.shape(_head, hs)
+	v.cyl(HEAD_R * 0.8, HEAD_R, HEAD_H, Vector3.ZERO, _head_mat, _head, Vector3.ZERO, 12)
+	v.cyl(0.012, 0.012, 0.02, Vector3(0, HEAD_H * 0.5 + 0.01, 0), dark, _head)
+	v.add_child(_head)
+	_claw_rids.append(_head.get_rid())
 	for i in 3:
-		var pivot := Node3D.new()
-		pivot.rotation.y = i * TAU / 3.0
-		_head.add_child(pivot)
-		var hinge := Node3D.new()
-		hinge.position = Vector3(0, -0.03, 0.05)
-		pivot.add_child(hinge)
-		v.box(Vector3(0.022, 0.12, 0.022), Vector3(0, -0.06, 0), chrome, hinge)
-		v.box(Vector3(0.022, 0.08, 0.022), Vector3(0, -0.14, -0.025), chrome, hinge, Vector3(0.6, 0, 0))
-		_prongs.append(hinge)
-	_laser = v.box(Vector3(0.006, 1.0, 0.006), Vector3.ZERO, v.glow(Color(1.0, 0.1, 0.15)))
-	_shadow = v.cyl(0.08, 0.08, 0.004, Vector3.ZERO, v.mat(Color(0.03, 0.0, 0.05)), null, Vector3.ZERO, 12)
+		var p := AnimatableBody3D.new()
+		p.sync_to_physics = false
+		v._layers(p)
+		var pm := PhysicsMaterial.new()
+		pm.friction = 1.0
+		p.physics_material_override = pm
+		var finger := BoxShape3D.new()
+		finger.size = Vector3(0.014, FINGER, 0.016)
+		var tip := BoxShape3D.new()
+		tip.size = Vector3(0.016, TIP, 0.016)
+		var f_at := Transform3D(Basis(), Vector3(0, -FINGER * 0.5, 0))
+		var t_basis := Basis(Vector3.RIGHT, CURL)
+		var t_at := Transform3D(t_basis, Vector3(0, -FINGER, 0) + t_basis * Vector3(0, -TIP * 0.5, 0))
+		var fcs: CollisionShape3D = v.shape(p, finger)
+		fcs.transform = f_at
+		var tcs: CollisionShape3D = v.shape(p, tip)
+		tcs.transform = t_at
+		v.box(finger.size, Vector3.ZERO, chrome, p).transform = f_at
+		v.box(tip.size, Vector3.ZERO, chrome, p).transform = t_at
+		v.ball(0.011, Vector3.ZERO, dark, p, 6)
+		v.add_child(p)
+		_prongs.append(p)
+		_prong_shapes.append([[finger, f_at], [tip, t_at]])
+		_claw_rids.append(p.get_rid())
+	_laser = v.box(Vector3(0.003, 1.0, 0.003), Vector3.ZERO, v.glow(Color(1.0, 0.1, 0.15)))
+	_shadow = v.cyl(0.045, 0.045, 0.002, Vector3.ZERO, v.mat(Color(0.03, 0.0, 0.05)), null, Vector3.ZERO, 12)
+	_place_claw()
 
 
 func _spawn(kind: String, at: Vector3) -> void:
-	var v = _view
-	var b := RigidBody3D.new()
-	b.position = at
-	b.rotation = Vector3(_rng.randf() * TAU, _rng.randf() * TAU, 0) * 0.3
+	var v = _v
+	var r := 0.068 if kind == "duck" else (0.075 if kind == "bear" else 0.07)
+	var b: RigidBody3D = v.rigid(at, 0.18, 1.0, 0.05)
+	b.rotation = Vector3(_rng.randf_range(-0.4, 0.4), _rng.randf() * TAU, _rng.randf_range(-0.4, 0.4))
 	b.set_meta("kind", kind)
-	var r := 0.11 if kind == "duck" else (0.14 if kind == "bear" else 0.12)
 	b.set_meta("r", r)
-	var shape := CollisionShape3D.new()
-	var sphere := SphereShape3D.new()
-	sphere.radius = r
-	shape.shape = sphere
-	b.add_child(shape)
-	var pm := PhysicsMaterial.new()
-	pm.friction = 0.9
-	pm.bounce = 0.05
-	pm.rough = true
-	b.physics_material_override = pm
-	b.mass = 0.4
-	b.angular_damp = 3.0
-	b.linear_damp = 0.4
+	b.physics_material_override.rough = true
+	b.angular_damp = 2.0
+	b.linear_damp = 0.3
+	b.continuous_cd = true
+	var body := SphereShape3D.new()
+	body.radius = r
+	v.shape(b, body)
 	match kind:
 		"duck":
+			var head := SphereShape3D.new()
+			head.radius = r * 0.62
+			v.shape(b, head, Vector3(0, r * 0.8, r * 0.3))
 			var yellow: ShaderMaterial = v.mat(Color(1.0, 0.85, 0.15), {"shine": 0.5})
 			v.ball(r, Vector3.ZERO, yellow, b)
-			v.ball(r * 0.6, Vector3(0, r * 0.75, r * 0.35), yellow, b)
-			v.box(Vector3(r * 0.5, r * 0.18, r * 0.45), Vector3(0, r * 0.7, r * 0.95), v.mat(Color(1.0, 0.45, 0.05)), b)
+			v.ball(r * 0.62, Vector3(0, r * 0.8, r * 0.3), yellow, b)
+			v.box(Vector3(r * 0.5, r * 0.18, r * 0.45), Vector3(0, r * 0.72, r * 0.95), v.mat(Color(1.0, 0.45, 0.05)), b)
+			v.box(Vector3(r * 0.5, r * 0.25, r * 0.6), Vector3(0, r * 0.2, -r * 0.95), yellow, b, Vector3(-0.5, 0, 0))
 			for s in [-1.0, 1.0]:
-				v.ball(r * 0.1, Vector3(s * r * 0.28, r * 0.95, r * 0.72), v.mat(Color(0.02, 0.02, 0.02)), b, 4)
+				v.ball(r * 0.1, Vector3(s * r * 0.3, r * 0.98, r * 0.72), v.mat(Color(0.02, 0.02, 0.02)), b, 4)
 		"bear":
-			var fur: ShaderMaterial = v.mat(Color(0.6, 0.38, 0.2), {"pattern": 3, "col2": Color(0.5, 0.3, 0.15), "texel": 60.0})
+			var head := SphereShape3D.new()
+			head.radius = r * 0.66
+			v.shape(b, head, Vector3(0, r * 0.95, 0))
+			var fur: ShaderMaterial = v.mat(Color(0.6, 0.38, 0.2), {"pattern": 3, "col2": Color(0.5, 0.3, 0.15), "texel": 120.0})
 			v.ball(r, Vector3.ZERO, fur, b)
+			v.ball(r * 0.66, Vector3(0, r * 0.95, 0), fur, b)
 			for s in [-1.0, 1.0]:
-				v.ball(r * 0.32, Vector3(s * r * 0.62, r * 0.78, 0), fur, b, 6)
-				v.ball(r * 0.1, Vector3(s * r * 0.3, r * 0.25, r * 0.9), v.mat(Color(0.02, 0.02, 0.02)), b, 4)
-			v.ball(r * 0.35, Vector3(0, -r * 0.05, r * 0.82), v.mat(Color(0.9, 0.75, 0.55)), b, 6)
+				v.ball(r * 0.26, Vector3(s * r * 0.5, r * 1.45, 0), fur, b, 6)
+				v.ball(r * 0.08, Vector3(s * r * 0.24, r * 1.05, r * 0.6), v.mat(Color(0.02, 0.02, 0.02)), b, 4)
+				v.ball(r * 0.3, Vector3(s * r * 0.7, -r * 0.55, r * 0.35), fur, b, 6)
+			v.ball(r * 0.25, Vector3(0, r * 0.85, r * 0.6), v.mat(Color(0.9, 0.75, 0.55)), b, 6)
+			v.box(Vector3(r * 0.9, r * 0.25, 0.01), Vector3(0, r * 0.35, r * 0.95), v.mat(Color(0.9, 0.15, 0.3)), b)
 		_:
 			var gold: ShaderMaterial = v.mat(Color(1.0, 0.8, 0.1), {"shine": 2.0, "glow": Color(0.35, 0.25, 0.0)})
-			v.ball(r, Vector3.ZERO, gold, b, 5)
-			v.cyl(0.0, r * 0.55, r * 0.9, Vector3(0, r * 1.1, 0), gold, b, Vector3.ZERO, 5)
-			v.text("*", Vector3(0, 0, r + 0.005), 40, Color(1, 1, 0.8), b)
-	v.root.add_child(b)
+			v.ball(r, Vector3.ZERO, gold, b, 6)
+			for k in 5:
+				var a := k * TAU / 5.0
+				v.cyl(0.0, r * 0.38, r * 0.6, Vector3(sin(a), cos(a), 0) * r * 1.05, gold, b, Vector3(0, 0, -a), 5)
+			v.text("*", Vector3(0, 0, r + 0.002), 30, Color(1, 1, 0.8), b, Vector3.ZERO, 0.0015)
+	v.add_child(b)
 	_prizes.append(b)
 
 
 func _controls() -> void:
 	# Arrow keys on the left (back on top, then left / front / right),
-	# DROP on the right.
-	var pad := GridContainer.new()
-	pad.columns = 3
-	pad.position = Vector2(26, 1012)
-	pad.size = Vector2(390, 250)
-	pad.add_theme_constant_override("h_separation", 10)
-	pad.add_theme_constant_override("v_separation", 10)
-	add_child(pad)
+	# DROP on the right. Translucent, over the cabinet's base.
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.position = Vector2(26, 1012)
+	grid.size = Vector2(390, 250)
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	add_child(grid)
 	var dirs := [null, ["^", Vector2(0, -1)], null, ["<", Vector2(-1, 0)], ["v", Vector2(0, 1)], [">", Vector2(1, 0)]]
 	for d in dirs:
 		if d == null:
 			var gap := Control.new()
 			gap.custom_minimum_size = Vector2(120, 116)
-			pad.add_child(gap)
+			grid.add_child(gap)
 			continue
-		var b := button(d[0], 44)
+		var b := button(d[0], 44, Color(0.2, 0.12, 0.3, 0.82))
 		b.custom_minimum_size = Vector2(120, 116)
-		pad.add_child(b)
+		grid.add_child(b)
 		var dir: Vector2 = d[1]
 		b.button_down.connect(func(): _dir = dir)
 		b.button_up.connect(func(): _dir = Vector2.ZERO)
-		b.pressed.connect(func(): _nudge(dir.x * 0.08, dir.y * 0.08))
-	_drop = button("DROP", 44, Color(0.55, 0.1, 0.3))
+	_drop = button("DROP", 44, Color(0.55, 0.1, 0.3, 0.88))
 	_drop.position = Vector2(436, 1012)
 	_drop.size = Vector2(258, 242)
 	_drop.custom_minimum_size = Vector2(258, 242)
@@ -249,7 +342,7 @@ func _controls() -> void:
 	add_child(_drop)
 
 
-# ---------------------------------------------------------------- playing
+# ---------------------------------------------------------------- input
 
 const PAD_DEAD := 0.25
 const DPAD := {
@@ -317,185 +410,297 @@ func _steer() -> Vector2:
 	return v.limit_length(1.0)
 
 
-func _clamp_claw() -> void:
-	_claw.x = clampf(_claw.x, -HALF.x + 0.1, HALF.x - 0.1)
-	_claw.z = clampf(_claw.z, -HALF.y + 0.1, HALF.y - 0.1)
-
-
+## Nudge the claw while it's waiting (tools and tests).
 func _nudge(dx: float, dz := 0.0) -> void:
 	if _state == S.IDLE:
-		_claw.x += dx
-		_claw.z += dz
-		_clamp_claw()
+		_at += Vector2(dx, dz)
+		_at = _clamped(_at)
+
+
+## The open claw (0.14 m round) can't go into the corners.
+func _clamped(p: Vector2) -> Vector2:
+	return Vector2(clampf(p.x, X0 + 0.11, X1 - 0.11), clampf(p.y, Z0 + 0.11, Z1 - 0.11))
 
 
 func _on_drop() -> void:
-	if _state != S.IDLE:
+	if _state != S.IDLE or cage == null:
 		return
 	if not pay_token():
 		return
 	_strong = ArcadeRules.claw_strong(_grabs)
 	_grabs += 1
 	_state = S.DROP
+	_slack = false
+	_ride = 0.0
+	_lifted = null
 	_dir = Vector2.ZERO
 	sfx("click")
 
 
-## Where the claw tips are (just under the head).
-func _tip() -> Vector3:
-	return _claw + Vector3(0, -0.17, 0)
+# ---------------------------------------------------------------- the claw
+
+## The head, hanging under the carriage (plus its swing), in cage metres.
+func _head_pos() -> Vector3:
+	return Vector3(_at.x + _swing.x, _head_y, _at.y + _swing.y)
 
 
-## What's under the claw: the top of the prize pile, or the floor.
-func _ground_y() -> float:
-	var hit: Dictionary = _view.ray(Vector3(_claw.x, RAIL_Y - 0.05, _claw.z), Vector3(_claw.x, -0.5, _claw.z), _held_rid())
-	return hit.position.y if hit else -0.5
+## Prong i's transform (cage metres) with its prongs at `angle`.
+func _prong_xf(i: int, head: Vector3, angle: float) -> Transform3D:
+	var a := i * TAU / 3.0 + sin(_t * 0.6) * 0.1
+	var hinge := Vector3(sin(a) * HINGE_R, -HEAD_H * 0.5 - 0.004, cos(a) * HINGE_R)
+	return Transform3D(Basis(Vector3.UP, a) * Basis(Vector3.RIGHT, angle), head + hinge)
 
 
-func _held_rid() -> Array[RID]:
-	var out: Array[RID] = []
-	if _held:
-		out.append(_held.get_rid())
+## The prizes prong i would cut into at transform xf (walls and floor are
+## left to _below_floor: a prong scraping them never stops it closing).
+func _prong_hits(i: int, xf: Transform3D, exclude: Array[RID]) -> Array:
+	var out := []
+	# The curled tips do the gripping (the fingers above just ride along).
+	for s in [_prong_shapes[i][1]]:
+		for c in _v.hits(s[0], xf * s[1], exclude):
+			if c is RigidBody3D and not c in out:
+				out.append(c)
 	return out
 
 
-func _process(delta: float) -> void:
-	super._process(delta)
+## How far prong i's tip would be under the floor (0 if it's above it).
+func _below_floor(xf: Transform3D) -> float:
+	var knuckle := xf * Vector3(0, -FINGER, 0)
+	var tip := knuckle + xf.basis * (Basis(Vector3.RIGHT, CURL) * Vector3(0, -TIP, 0))
+	return maxf(0.0, FLOOR + 0.006 - minf(knuckle.y, tip.y))
+
+
+## Swing the prongs toward `target`. Closing, each prong stops as soon as it
+## would cut into a prize, so it grips, never crushes (prizes it was already
+## shoved into when it came down don't count: it closes through them and the
+## physics pushes them aside). A prong scraping the floor lifts the head a
+## little instead (`ride`), so it scoops underneath.
+func _move_prongs(target: float, rate: float, delta: float, ride := false) -> void:
+	var head := _head_pos()
+	var scrape := false
+	for i in 3:
+		if target <= _angles[i]:
+			_angles[i] = maxf(target, _angles[i] - rate * delta)
+			continue
+		var next := minf(target, _angles[i] + rate * delta)
+		var xf := _prong_xf(i, head, next)
+		if _below_floor(xf) > 0.0:
+			scrape = true
+			continue
+		var ex: Array[RID] = _claw_rids.duplicate()
+		ex.append_array(_stuck[i])
+		if _prong_hits(i, xf, ex).is_empty():
+			_angles[i] = next
+	if scrape and ride and _ride < RIDE:
+		_ride += 0.004
+		_head_y += 0.004
+
+
+## Coming down: note what each prong is already pushed into.
+func _note_stuck() -> void:
+	var head := _head_pos()
+	for i in 3:
+		_stuck[i].clear()
+		for c in _prong_hits(i, _prong_xf(i, head, _angles[i]), _claw_rids):
+			_stuck[i].append(c.get_rid())
+
+
+## Lowering: stop when the head sits on something, or the open prongs would
+## dig into the floor or a wall (prizes in their way just get shoved aside).
+func _blocked_below(next_y: float) -> bool:
+	if next_y <= FLOOR + HEAD_H * 0.5 + 0.02:
+		return true
+	var head := _head_pos()
+	var hit: Dictionary = _v.ray(head, head - Vector3(0, HEAD_H * 0.5 + 0.008, 0), _claw_rids)
+	if hit:
+		return true
+	var low := Vector3(head.x, next_y, head.z)
+	for i in 3:
+		if _below_floor(_prong_xf(i, low, _angles[i])) > 0.0:
+			return true
+	return false
+
+
+func _physics_process(delta: float) -> void:
+	if cage == null:
+		return
 	_t += delta
-	var target_open := OPEN
+	var want := Vector2.ZERO
 	match _state:
 		S.IDLE:
-			var steer := _steer()
-			_claw.x += steer.x * SPEED * delta
-			_claw.z += steer.y * SPEED * delta
-			_clamp_claw()
+			want = _steer() * SPEED
+			_move_prongs(OPEN, 2.0, delta)
 		S.DROP:
-			_claw.y -= DROP_SPEED * delta
-			if _tip().y <= maxf(_ground_y(), 0.0) + 0.04:
+			var next := _head_y - DROP_SPEED * delta
+			if _blocked_below(next):
 				_state = S.CLOSE
-				_close_t = 0.0
+				_timer = 0.0
+				_note_stuck()
+				sfx("click", -8.0, 0.7)
+			else:
+				_head_y = next
 		S.CLOSE:
-			_close_t += delta
-			target_open = SHUT
-			if _close_t > 0.45:
-				_held = _nearest()
-				if _held:
-					_held.freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
-					_held.freeze = true
-					sfx("thump", -4.0)
-				_rise_from = _claw.y
+			_timer += delta
+			_move_prongs(SHUT, CLOSE_RATE, delta, true)
+			if _timer > 1.0:
 				_state = S.RISE
+				_rise_from = _head_y
+				_timer = 0.0
+				sfx("thump", -10.0, 1.3)
 		S.RISE:
-			target_open = 0.32 if _held else SHUT
-			_claw.y += DROP_SPEED * 0.6 * delta
-			if _held and not _strong and _claw.y > lerpf(_rise_from, RAIL_Y, ArcadeRules.CLAW_WEAK_HOLD):
-				_let_go()
-				banner("IT SLIPPED!", 1.2, Color(1.0, 0.6, 0.5))
-			if _claw.y >= RAIL_Y:
-				_claw.y = RAIL_Y
-				_state = S.CARRY if _held else S.IDLE
-				if not _held:
-					_update_grip()
+			_timer += delta
+			_head_y = minf(HEAD_Y, _head_y + RISE_SPEED * delta)
+			var up := (_head_y - _rise_from) / maxf(0.01, HEAD_Y - _rise_from)
+			if not _strong and up > ArcadeRules.CLAW_WEAK_HOLD and not _slack:
+				# The weak grab: power drops and the prongs go slack.
+				_slack = true
+				for i in 3:
+					_angles[i] -= SLACK
+				sfx("click", -6.0, 0.6)
+			if not _slack:
+				_move_prongs(SHUT, CLOSE_RATE * 0.5, delta)
+			if _timer > 0.35 and _lifted == null:
+				_lifted = _in_claw()
+			if _head_y >= HEAD_Y:
+				_state = S.CARRY
 		S.CARRY:
-			target_open = 0.32
-			var to := Vector2(CHUTE.get_center().x, CHUTE.get_center().y)
-			var at := Vector2(_claw.x, _claw.z).move_toward(to, SPEED * 1.2 * delta)
-			_claw.x = at.x
-			_claw.z = at.y
-			if at.distance_to(to) < 0.005:
-				_let_go()
+			var home := Vector2(CHUTE.get_center().x + 0.01, CHUTE.get_center().y)
+			want = (home - _at).limit_length(SPEED)
+			if _at.distance_to(home) < 0.01 and _vel.length() < 0.05:
 				_state = S.OPEN_UP
-				_close_t = 0.0
+				_timer = 0.0
+				sfx("click", -6.0, 0.8)
+			elif not _slack:
+				_move_prongs(SHUT, CLOSE_RATE * 0.5, delta)
 		S.OPEN_UP:
-			_close_t += delta
-			if _close_t > 0.5:
+			_timer += delta
+			_move_prongs(OPEN, 2.5, delta)
+			if _timer > 0.9:
 				_state = S.IDLE
 				_update_grip()
-	_open = move_toward(_open, target_open, delta * 3.0)
-	if _held:
-		_hold(_held)
+	# The carriage speeds up and slows down; the head swings on its cable.
+	var was := _vel
+	_vel = _vel.move_toward(want, ACCEL * delta)
+	if _state == S.CARRY and _at.distance_to(Vector2(CHUTE.get_center().x + 0.01, CHUTE.get_center().y)) < 0.04:
+		_vel = _vel.limit_length(_at.distance_to(Vector2(CHUTE.get_center().x + 0.01, CHUTE.get_center().y)) * 4.0)
+	_at = _clamped(_at + _vel * delta)
+	var acc := (_vel - was) / maxf(delta, 0.001)
+	var cable := maxf(0.08, RAIL_Y - _head_y)
+	_swing_v += (-_swing * (9.8 / cable) - acc - _swing_v * 2.2) * delta
+	_swing = (_swing + _swing_v * delta).limit_length(0.035)
+	_place_claw()
+	if _state != S.IDLE and _state != S.DROP:
+		_wake_near()
+	_check_slip()
 	_collect()
-	_draw_rig()
 
 
-func _nearest() -> RigidBody3D:
-	var best: RigidBody3D
-	var bd := REACH
-	var tip := _tip()
+func _place_claw() -> void:
+	var head := _head_pos()
+	_head.transform = Transform3D(Basis(Vector3.UP, sin(_t * 0.6) * 0.1), head)
+	for i in 3:
+		_prongs[i].transform = _prong_xf(i, head, _angles[i])
+
+
+## Physics lets resting bodies sleep, and a sleeping prize wouldn't notice
+## the prongs opening under it: keep the ones by the claw awake.
+func _wake_near() -> void:
+	var head := _head_pos()
 	for p in _prizes:
-		var r: float = p.get_meta("r")
-		var flat := Vector2(p.position.x - tip.x, p.position.z - tip.z).length()
-		var dy := absf(p.position.y + r * 0.5 - tip.y)
-		if flat < bd and dy < r + 0.12:
-			bd = flat
-			best = p
-	return best
+		if p.sleeping and p.position.distance_to(head) < 0.3:
+			p.sleeping = false
 
 
-func _hold(b: RigidBody3D) -> void:
-	var r: float = b.get_meta("r")
-	var t := b.global_transform
-	t.origin = _tip() + Vector3(0, -r * 0.55, 0)
-	b.global_transform = t
-	PhysicsServer3D.body_set_state(b.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM, t)
+## The prize sitting in the prongs right now, if any.
+func _in_claw() -> RigidBody3D:
+	var head := _head_pos()
+	for p in _prizes:
+		var off := p.position - head
+		if off.y < 0.0 and off.y > -0.2 and Vector2(off.x, off.z).length() < 0.06:
+			return p
+	return null
 
 
-func _let_go() -> void:
-	if _held == null:
+func _check_slip() -> void:
+	if _lifted == null or _state not in [S.RISE, S.CARRY]:
 		return
-	_hold(_held)
-	_held.freeze = false
-	_held.sleeping = false
-	_held.linear_velocity = Vector3(0, -0.4, 0)
-	_held = null
+	if not is_instance_valid(_lifted) or _lifted.position.y < _head_y - 0.3:
+		_lifted = null
+		banner("IT SLIPPED!", 1.2, Color(1.0, 0.6, 0.5))
+		sfx("groan", -10.0)
 
 
-## Prizes that fell down the chute pay out; the box refills from the top.
+## Prizes that fell down the chute pay out and roll into the tray; the cage
+## refills from the top. Anything that escapes the cage comes back in.
 func _collect() -> void:
 	for p in _prizes.duplicate():
-		if p == _held:
-			continue
-		if p.position.y < -0.35:
-			var kind: String = p.get_meta("kind")
+		var at: Vector3 = p.position
+		if at.y < FLOOR - 0.12 and at.x < CHUTE.end.x and at.z > CHUTE.position.y:
 			_prizes.erase(p)
-			p.queue_free()
-			var t := ArcadeRules.claw_tickets(kind)
-			var beats := ArcadeRules.claw_beats(kind)
-			win(t, "claw", beats)
-			sfx("jackpot" if beats else "ding")
-			banner("%s!\n+%d TICKETS" % [ArcadeRules.CLAW_PRIZES[kind].name, t], 2.4)
-			var stars := 0
-			for q in _prizes:
-				if q.get_meta("kind") == "star":
-					stars += 1
-			var kind_new := "star" if stars < STAR_KEEP else ("bear" if _rng.randf() < 0.35 else "duck")
-			_spawn(kind_new, _random_spot(1.0))
+			if p == _lifted:
+				_lifted = null
+			_won(p)
+		elif at.y < 0.0 or at.y > 3.0 or absf(at.x) > 1.0 or absf(at.z) > 1.0:
+			p.position = _random_spot(TOP - 0.15)
+			p.linear_velocity = Vector3.ZERO
+	for e in _tray.duplicate():
+		e.t -= get_physics_process_delta_time()
+		if e.t <= 0.0:
+			_tray.erase(e)
+			e.body.queue_free()
 
 
-func _draw_rig() -> void:
-	_bridge.position.x = _claw.x
-	_carriage.position.z = _claw.z
-	var top := RAIL_Y + 0.05
-	var len := maxf(0.01, top - (_claw.y + 0.03))
-	_cable.position = Vector3(_claw.x, top - len * 0.5, _claw.z)
+func _won(p: RigidBody3D) -> void:
+	var kind: String = p.get_meta("kind")
+	var t := ArcadeRules.claw_tickets(kind)
+	var beats := ArcadeRules.claw_beats(kind)
+	win(t, "claw", beats)
+	sfx("jackpot" if beats else "ding")
+	banner("%s!\n+%d TICKETS" % [ArcadeRules.CLAW_PRIZES[kind].name, t], 2.4)
+	_flash = 1.0
+	# Out into the tray behind the little door, to look at for a bit.
+	for e in _tray:
+		e.t = minf(e.t, 0.5)
+	p.position = TRAY
+	p.linear_velocity = Vector3(0, -0.2, 0.25)
+	_tray.append({"body": p, "t": 6.0})
+	var stars := 0
+	for q in _prizes:
+		if q.get_meta("kind") == "star":
+			stars += 1
+	var kind_new := "star" if stars < STAR_KEEP else ("bear" if _rng.randf() < 0.35 else "duck")
+	_spawn(kind_new, _random_spot(TOP - 0.15))
+
+
+# ---------------------------------------------------------------- drawing
+
+func _process(delta: float) -> void:
+	super._process(delta)
+	if cage == null:
+		return
+	var head := _head_pos()
+	_bridge.position.x = _at.x
+	_carriage.position.z = _at.y
+	var top := RAIL_Y - 0.03
+	var len := maxf(0.01, top - (head.y + HEAD_H * 0.5 + 0.02))
+	_cable.position = Vector3((_at.x + head.x) * 0.5, top - len * 0.5, (_at.y + head.z) * 0.5)
 	_cable.scale = Vector3(1, len, 1)
-	_head.position = _claw
-	_head.rotation.y = sin(_t * 0.7) * 0.15
-	for h in _prongs:
-		h.rotation.x = 0.3 - _open
-	var ground := maxf(_ground_y(), -0.05)
-	var show := _state == S.IDLE
-	_laser.visible = show
-	_shadow.visible = ground > -0.1
-	var drop := maxf(0.01, _claw.y - 0.05 - ground)
-	_laser.position = Vector3(_claw.x, ground + drop * 0.5, _claw.z)
+	_cable.rotation = Vector3(-(_swing.y) / maxf(len, 0.1), 0, _swing.x / maxf(len, 0.1))
+	# The aiming laser and the claw's shadow on whatever is below.
+	var hit: Dictionary = _v.ray(head - Vector3(0, HEAD_H * 0.5, 0), Vector3(head.x, FLOOR - 0.2, head.z), _claw_rids)
+	var ground: float = hit.position.y if hit else FLOOR - 0.035
+	_laser.visible = _state == S.IDLE
+	var drop := maxf(0.01, head.y - HEAD_H * 0.5 - ground)
+	_laser.position = Vector3(head.x, ground + drop * 0.5, head.z)
 	_laser.scale = Vector3(1, drop, 1)
-	_shadow.position = Vector3(_claw.x, ground + 0.003, _claw.z)
-	var s := clampf(1.3 - (_claw.y - ground) * 0.4, 0.5, 1.3)
+	_shadow.position = Vector3(head.x, ground + 0.002, head.z)
+	var s := clampf(1.4 - (head.y - ground) * 0.6, 0.5, 1.4)
 	_shadow.scale = Vector3(s, 1, s)
 	var lit: bool = hub != null and hub.state.has("gloria_eye") and ArcadeRules.claw_strong(_grabs) and _state == S.IDLE
 	_head_mat.set_shader_parameter("emission", Color(0.1, 0.8, 0.3) if lit else Color.BLACK)
-	var step := int(_t * 6.0)
+	_flash = maxf(0.0, _flash - delta)
+	_chute_mat.set_shader_parameter("emission", Color(0.9, 0.6, 0.1).lerp(Color(1, 1, 0.8), _flash))
+	var step := int(_t * (14.0 if _flash > 0.0 else 6.0))
 	for i in _bulbs.size():
 		_bulbs[i].set_shader_parameter("emission", Color(1.0, 0.85, 0.35) if (step + i) % 3 == 0 else Color(0.3, 0.12, 0.08))
 
@@ -503,7 +708,7 @@ func _draw_rig() -> void:
 func _update_grip() -> void:
 	if hub == null or not hub.state.has("gloria_eye"):
 		_grip.text = "STEER  ^ v < >  THEN DROP"
-		_grip.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
+		_grip.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
 		return
 	var strong := ArcadeRules.claw_strong(_grabs)
 	var left := (ArcadeRules.CLAW_STRONG_EVERY - 1 - _grabs % ArcadeRules.CLAW_STRONG_EVERY)

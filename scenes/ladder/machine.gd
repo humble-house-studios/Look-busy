@@ -25,6 +25,11 @@ const SFX := {
 }
 
 var hub: Node
+## The glass-cage machines (claw, coin pusher, Fall Guy): the cabinet's
+## inside in the office's own 3D world (scenes/ladder/cage3d.gd), set by the
+## ladder before this is added. This Control is then only the controls, drawn
+## over the glass while you sit there (transparent everywhere else).
+var cage: Node3D
 var active := false
 ## The controller frame for this screen (scenes/pad_cursor.gd).
 var pad: Node
@@ -113,15 +118,25 @@ func full(c: Control) -> Control:
 
 
 ## A plain background with a title bar: the machine's name and, below it, a
-## line for tokens / tickets (refresh_top()).
+## line for tokens / tickets (refresh_top()). A glass-cage machine passes a
+## clear bg: no background (the real cabinet shows through), just a dark
+## strip behind the title so it reads over the marquee.
 func frame(title: String, bg: Color, title_color: Color) -> void:
 	accent = title_color
-	var back := ColorRect.new()
-	back.color = bg
-	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Behind this Control's own _draw(), so machines can draw over it.
-	back.show_behind_parent = true
-	add_child(full(back))
+	if bg.a > 0.0:
+		var back := ColorRect.new()
+		back.color = bg
+		back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# Behind this Control's own _draw(), so machines can draw over it.
+		back.show_behind_parent = true
+		add_child(full(back))
+	else:
+		var strip := Panel.new()
+		strip.add_theme_stylebox_override("panel", box(Color(0.02, 0.01, 0.04, 0.72), Color(title_color, 0.6), 3, 10))
+		strip.position = Vector2(236, 26)
+		strip.size = Vector2(W - 256, 72)
+		strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(strip)
 	# Right of the office's STAND UP button, which sits over the top-left
 	# corner of the screen while you're seated on a phone.
 	var t := label(title, 30, title_color, HORIZONTAL_ALIGNMENT_RIGHT)
@@ -130,12 +145,16 @@ func frame(title: String, bg: Color, title_color: Color) -> void:
 	add_child(t)
 	_top = label("", 20, Color(1.0, 0.92, 0.55), HORIZONTAL_ALIGNMENT_RIGHT)
 	_top.position = Vector2(250, 100)
+	if bg.a <= 0.0:
+		# The cabinet's own marquee shows the name: just the tokens here.
+		t.visible = false
+		_top.position = Vector2(250, 42)
 	_top.size = Vector2(W - 270, 40)
 	add_child(_top)
 	_banner = label("", 40, Color(1.0, 0.9, 0.3))
 	_banner.add_theme_color_override("font_outline_color", Color.BLACK)
 	_banner.add_theme_constant_override("outline_size", 14)
-	_banner.position = Vector2(20, 470)
+	_banner.position = Vector2(20, 470 if bg.a > 0.0 else 330)
 	_banner.size = Vector2(W - 40, 240)
 	_banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_banner.modulate.a = 0.0

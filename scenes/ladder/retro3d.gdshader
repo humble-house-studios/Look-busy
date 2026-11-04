@@ -1,4 +1,4 @@
-// The arcade machines' little 3D worlds (scenes/ladder/view3d.gd): PS1-ish
+// The arcade machines' 3D insides (scenes/ladder/cage3d.gd, view3d.gd): PS1-ish
 // snapped vertices, light worked out per vertex from a few point lights and a
 // sun, cheap shine, chunky procedural patterns, fog and an ordered-dither
 // palette. Unshaded, so it looks the same on every renderer.
@@ -57,8 +57,11 @@ void vertex() {
 	vec4 vp = VIEW_MATRIX * vec4(wp, 1.0);
 	fogv = clamp((-vp.z - fog_near) / max(fog_far - fog_near, 0.001), 0.0, 1.0);
 	POSITION = PROJECTION_MATRIX * vp;
-	if (snap.x > 0.0) {
-		POSITION.xy = floor(POSITION.xy / POSITION.w * snap + 0.5) / snap * POSITION.w;
+	// snap < 0: the grid of whatever viewport draws it (the cages in the
+	// office world); 0: no snapping.
+	vec2 grid = snap.x < 0.0 ? VIEWPORT_SIZE * 0.5 : snap;
+	if (grid.x > 0.0) {
+		POSITION.xy = floor(POSITION.xy / POSITION.w * grid + 0.5) / grid * POSITION.w;
 	}
 }
 

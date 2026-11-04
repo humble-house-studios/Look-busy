@@ -5,7 +5,7 @@ extends SceneTree
 ##   OUT=/some/dir LAYOUT=portrait xvfb-run -a -s "-screen 0 720x1280x24" \
 ##     godot --rendering-driver opengl3 --resolution 720x1280 -s res://tools/ladder_shot.gd
 ## Shots: arcade from the door, the claw and Gloria, playing the claw,
-## the coin pusher, the ragdoll mid-fling, talking to Gloria (line, replies,
+## the coin pusher, the Fall Guy column mid-bounce, talking to Gloria (line, replies,
 ## answer), the prize counter, the trading floor and its terminal, the
 ## boardroom and the pitch, the corner office and the memo, the stage and the
 ## set list, the archive. It wipes user://dale.cfg, ladder.cfg, coworkers.cfg.
@@ -58,7 +58,7 @@ func _init() -> void:
 	_shot("pusher")
 	office._set_seat(office._ladder._machines.ragdoll.pc)
 	await _frames(80)
-	office._ladder._machines.ragdoll.node._on_fling()
+	office._ladder._machines.ragdoll.node._on_launch()
 	await _frames(45)
 	_shot("ragdoll")
 	office._set_seat(null)

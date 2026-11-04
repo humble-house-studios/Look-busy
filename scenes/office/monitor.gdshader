@@ -11,9 +11,12 @@ uniform float glass = 0.06;
 // 0 = clean (crisp copy), 1 = full CRT look (world copy).
 uniform float crt = 0.0;
 uniform float lines = 240.0;
+// 1 = see-through where the game is (the arcade cages' control overlay).
+uniform float use_alpha = 0.0;
 
 void fragment() {
-	vec3 col = texture(game, UV).rgb;
+	vec4 tex = texture(game, UV);
+	vec3 col = tex.rgb;
 	vec2 v = UV - 0.5;
 	// A little glass sheen in the top corner.
 	col += glass * smoothstep(0.35, 0.0, length(v - vec2(-0.3, -0.35)));
@@ -23,5 +26,5 @@ void fragment() {
 	col *= mix(1.0, scan * vig, crt);
 	col = mix(col, col * 1.08 + vec3(0.02, 0.015, 0.0), crt);
 	ALBEDO = col;
-	ALPHA = fade;
+	ALPHA = fade * mix(1.0, tex.a, use_alpha);
 }
