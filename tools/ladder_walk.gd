@@ -106,7 +106,10 @@ func _init() -> void:
 	office._set_seat(ladder._machines.trading.pc)
 	await frames(30)
 	term._open()
-	term.market.cash = term.market.target  # skip the playing; the rules are tested elsewhere
+	# Skip the playing (the rules are tested elsewhere): Friday, rich, at the bell.
+	term.market.day = Market.DAYS
+	term.market.cash = term.market.goal() * 2.0
+	term.market.clock = term.market.day_seconds() - 0.01
 	# Headless frames can be tiny; step the terminal by a full market tick.
 	term._process(Market.TICK + 0.01)
 	await frames(10)

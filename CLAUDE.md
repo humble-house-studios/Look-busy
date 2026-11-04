@@ -204,7 +204,16 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   `_add_computer()`; `hub` is the ladder node. Rules in `engine/ladder_state.gd`
   (`user://ladder.cfg`), `engine/coworkers.gd` + `data/coworker_lines.gd`
   (`user://coworkers.cfg`), `arcade_rules.gd`, `market.gd`, `pitch.gd`,
-  `final_set.gd`, tested in `tests/test_ladder.gd`. **The arcade cabinets
+  `final_set.gd`, tested in `tests/test_ladder.gd`. **The trading floor**
+  (`engine/market.gd`, screen `scenes/ladder/trading.gd`) is a trading week:
+  a goal every day (grow by +8% Monday up to +20% Friday, harder each week
+  after), the bell closes every trade, the after-hours shop sells perks
+  (short license, stop-loss, crystal ball, margin...) for cash. Stocks have
+  personalities to learn; rumors count down to news, a quarter are fake;
+  profits in a row pay a HOT HAND bonus. Clearing Friday opens the boardroom;
+  the record (most days in one run) is the desk's stars. Balance:
+  `godot --headless -s res://tools/market_tune.gd` (bots: idle 0%, blind
+  rumor ~13%, skilled ~60% clear Friday). **The arcade cabinets
   are glass cages, not screens:** the claw machine, coin pusher and Fall Guy
   are built straight into the arcade's 3D world (`scenes/ladder/cage3d.gd`:
   the machine script builds its cage inside the cabinet shell from

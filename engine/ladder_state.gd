@@ -2,7 +2,7 @@ class_name LadderState
 extends RefCounted
 ## Progress up the ladder, one elevator ride per floor: the arcade (tokens
 ## in, tickets out, the prize counter sells the Elevator Key), the trading floor
-## (tickets cash out as your portfolio; double it), the boardroom (Dale is
+## (tickets cash out as your portfolio; survive a trading week), the boardroom (Dale is
 ## waiting there: he's the founder; then win the pitch), the corner office
 ## (his memo) and the locked TOP FLOOR elevator (the final room; not built yet).
 ## Hidden extras for players who dig: the archive in the arcade basement, and
@@ -32,7 +32,9 @@ const PRIZES := [
 	{"id": "stress_ball", "name": "STRESS BALL", "cost": 40, "note": "For Bernie's desk. Spare Dale.", "for": "bernie"},
 	{"id": "coffee", "name": "HOT COFFEE", "cost": 20, "note": "Nobody brings the janitor coffee", "for": "ray"},
 ]
-## Trading floor: you start with this plus your leftover tickets, then double it.
+## Trading floor: you start with this plus your leftover tickets, then survive
+## a trading week (engine/market.gd: a goal every day). MARKET_GOAL is the
+## old "double it" target, kept for what it shows.
 const MARKET_BASE_CASH := 1000
 const MARKET_PER_TICKET := 5
 const MARKET_GOAL := 2.0
@@ -111,6 +113,14 @@ func win_tickets(n: int, machine := "") -> void:
 	if machine != "" and n > int(best.get(machine, 0)):
 		best[machine] = n
 	save()
+
+
+## The trading floor's record: most days cleared in one run (kept in best,
+## read by the desk's stars). Pays no tickets.
+func trading_record(days: int) -> void:
+	if days > int(best.get("trading", 0)):
+		best["trading"] = days
+		save()
 
 
 ## A machine's big prize. True the first time.

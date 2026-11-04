@@ -42,6 +42,27 @@ func _init() -> void:
 			await _shot("putt_roll")
 			await _frames(300)
 			await _shot("putt_end")
+		"trading":
+			m._open()
+			m.market.perks.append_array(["short", "crystal", "stop"])
+			await _frames(200)
+			m._sel = "BRCK"
+			m._buy()
+			await _frames(160)
+			await _shot("trading_trade")
+			m._sel = "PRF"
+			m.market.cash = m.market.goal() * 1.5
+			m._sell()
+			await _frames(120)
+			await _shot("trading_short")
+			m.market.clock = m.market.day_seconds() - 0.05
+			await _frames(20)
+			await _shot("trading_shop")
+			m.market.cash = 0.0
+			m._next_day()
+			m.market.clock = m.market.day_seconds() - 0.05
+			await _frames(20)
+			await _shot("trading_over")
 	print("tickets/state: ", m.get("_strokes"), " ", m.get("_last_score"))
 	quit()
 

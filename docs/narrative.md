@@ -62,7 +62,7 @@ paycheck → tokens → tickets → portfolio → board votes → material.
 |---|---|---|
 | Arcade (the break room) | Glass-cage cabinets with real physics: Claw King, Push Your Luck (coin pusher), Fall Guy (bounce the Dale dummy up a glass column), prize counter | Buy the ELEVATOR KEY (300 tickets) |
 | Archive (basement, secret) | Shelved games with notes about the founder | Ray's key sends the elevator by the claw down to it; finding it counts for the true ending |
-| Trading floor | Five stocks from your world on a 90s ticker; RUMORS come before NEWS | Double your cashed-out tickets by day 8 |
+| Trading floor | A trading week, live: five stocks with personalities (steady, wave, rocket, spiky, meme), RUMORS before NEWS (some fake), market crashes and halts, shorting, hot-hand streaks, perks after hours | Hit every day's goal through Friday |
 | Boardroom | Dale is waiting: he's the founder (the reveal). Then answer each board member's objection with a matching card (YES, AND is wild) | Hear Dale out, then 3 yeses of 5 |
 | Corner office | Dale's memo; a putting toy; the fabled smoothie machine; the TOP FLOOR elevator (locked: the final room, not built yet) | Read the memo |
 | The stage (The Brick Wall), hidden | Behind a bookcase in the corner office; opens once you've found the archive and Ray told you the building was a club. An empty club and one more set, for fun | An extra, no finale |

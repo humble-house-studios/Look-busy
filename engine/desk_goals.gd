@@ -40,6 +40,10 @@ const DESKS := {
 		["best:pusher", 1, "PUSH A COIN OFF THE EDGE"],
 		["best:pusher", 25, "PUSH OFF A GREEN BUNDLE"],
 		["beat:pusher", 1, "PUSH OFF THE GOLD JACKPOT CHIP"]]},
+	"trading": {"name": "TRADING FLOOR", "tiers": [
+		["best:trading", 1, "CLEAR MONDAY'S GOAL"],
+		["best:trading", 5, "SURVIVE THE WEEK: CLEAR FRIDAY"],
+		["best:trading", 10, "SURVIVE WEEK 2"]]},
 	"ragdoll": {"name": "FALL GUY", "tiers": [
 		["best:ragdoll", 1, "SCORE ANY POINTS"],
 		["best:ragdoll", 15, "SCORE 750 IN ONE ROUND"],
@@ -47,7 +51,7 @@ const DESKS := {
 }
 
 ## The desks in the order they're met.
-const ORDER := ["pong", "comedy", "cube", "loot", "proof", "claw", "pusher", "ragdoll"]
+const ORDER := ["pong", "comedy", "cube", "loot", "proof", "claw", "pusher", "ragdoll", "trading"]
 
 
 static func has(id: String) -> bool:

@@ -11,7 +11,8 @@ extends Node
 ##     Kev, Bernie, Theo and, once two machines are beaten, Ray). Tokens in,
 ##     tickets out; the ELEVATOR KEY unlocks the next floor. Ray's key sends
 ##     the elevator by the claw down to the basement ARCHIVE.
-##   TRADING FLOOR (z 12-20): your tickets cash out as a portfolio; double it.
+##   TRADING FLOOR (z 12-20): your tickets cash out as a portfolio; survive a
+##     trading week (a goal every day, perks after hours).
 ##   BOARDROOM (z 20-26): Dale is waiting at the end of the table. He's the founder
 ##     (the reveal, partway up). Then pitch the board, three yeses of five.
 ##   CORNER OFFICE (z 26-32): Dale's memo on the desk, a 3D mini-golf toy, and
@@ -1074,7 +1075,7 @@ func buy(id: String) -> bool:
 func market_won() -> void:
 	state.mark("market")
 	_update_doors(false)
-	_toast("YOU DOUBLED IT.\nTHE ELEVATOR GOES UP TO THE BOARDROOM NOW")
+	_toast("YOU SURVIVED THE TRADING WEEK.\nTHE ELEVATOR GOES UP TO THE BOARDROOM NOW")
 
 
 func pitch_won() -> void:
@@ -1288,7 +1289,7 @@ func _entered(room: String) -> void:
 		"trading":
 			if state.market_cash <= 0:
 				var cash := state.market_start()
-				_toast("YOUR TICKETS CASHED OUT: $%d\nDOUBLE IT AT TERMINAL 1." % cash)
+				_toast("YOUR TICKETS CASHED OUT: $%d\nSURVIVE A TRADING WEEK AT TERMINAL 1." % cash)
 				_refresh_machines()
 		"corner":
 			_toast("THE CORNER OFFICE.\nNOBODY'S BEEN HERE IN YEARS.")
