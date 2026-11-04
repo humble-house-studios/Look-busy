@@ -1231,6 +1231,7 @@ func tick(delta: float) -> void:
 		if on != m.active:
 			m.active = on
 			m.node.set_active(on)
+			_fit_view(m)
 	_tick_people(delta, me)
 	_tick_ticker(delta)
 	# Standing at a locked door or elevator? Say what opens it.
@@ -1371,10 +1372,26 @@ func _update_rooms(force: bool) -> void:
 		var m: Dictionary = _machines[id]
 		var here: bool = m.room == _room
 		m.vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if here else (SubViewport.UPDATE_ONCE if force else SubViewport.UPDATE_DISABLED)
+		_fit_view(m)
 		m.node.process_mode = Node.PROCESS_MODE_INHERIT if here else Node.PROCESS_MODE_DISABLED
 		# A cage's physics stops with it (its bodies leave the physics space).
 		if m.cage:
 			m.cage.process_mode = m.node.process_mode
+
+
+## GPU memory: every machine screen is a 720x1280 render target (~7 MB of
+## video memory each), and phone browsers have little to spare. So a screen
+## only keeps its full size while it can be seen:
+## its floor is the one you're on, and for a glass cage (whose controls only
+## show while seated) while you sit at it. Otherwise it shrinks to 4x4. The
+## machine's Control keeps its own 720x1280 size, so nothing re-lays out.
+func _fit_view(m: Dictionary) -> void:
+	var need: bool = m.room == _room and (m.cage == null or m.active)
+	var want := MACHINE_PX if need else Vector2i(4, 4)
+	if m.vp.size != want:
+		m.vp.size = want
+		if need and m.vp.render_target_update_mode == SubViewport.UPDATE_DISABLED:
+			m.vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
 ## Run the elevators on (or riding to) your floor; rock the camera a little
