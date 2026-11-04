@@ -66,3 +66,30 @@ func test_token_chip_gives_a_play_back() -> void:
 	l.give_token()
 	assert_eq(l.tokens, 1)
 	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://test_arcade_ladder.cfg"))
+
+
+func test_rage_swings_break_more_the_harder_and_closer() -> void:
+	assert_eq(ArcadeRules.rage_cells(0.05, 1.0), 1, "a tap knocks parts loose, no more")
+	assert_eq(ArcadeRules.rage_cells(1.0, 0.0), 1, "far from the hit: just knocked loose")
+	assert_eq(ArcadeRules.rage_cells(1.0, 1.0), ArcadeRules.RAGE_CELLS_MAX)
+	assert_lt(ArcadeRules.rage_cells(0.4, 1.0), ArcadeRules.rage_cells(0.9, 1.0))
+	assert_gt(ArcadeRules.rage_cells(1.0 * ArcadeRules.RAGE_WEAK_X, 1.0), ArcadeRules.RAGE_CELLS_MAX, "the weak spot breaks it finer")
+	assert_lte(ArcadeRules.rage_cells(99.0, 1.0), ArcadeRules.RAGE_CELLS_MAX + 3, "capped for phones")
+
+
+func test_rage_pays_pieces_glass_and_clean_desk() -> void:
+	assert_eq(ArcadeRules.rage_tickets(0, 0, false), 0)
+	assert_eq(ArcadeRules.rage_tickets(10, 0, false), 10 * ArcadeRules.RAGE_PIECE)
+	assert_eq(ArcadeRules.rage_tickets(0, 4, false), 4 * ArcadeRules.RAGE_GLASS)
+	assert_eq(ArcadeRules.rage_tickets(5, 2, true), 5 * ArcadeRules.RAGE_PIECE + 2 * ArcadeRules.RAGE_GLASS + ArcadeRules.RAGE_CLEAN)
+	assert_gt(ArcadeRules.RAGE_GLASS, ArcadeRules.RAGE_PIECE, "glass pays more")
+
+
+func test_rage_missions_are_in_the_list() -> void:
+	var a := ArcadeMissions.new(SAVE)
+	assert_eq(a.current("rage").key, "pieces")
+	assert_true(a.event("rage", "pieces", 3).is_empty(), "needs 5 in one play")
+	assert_false(a.event("rage", "pieces", 5).is_empty())
+	assert_eq(a.current("rage").key, "weak")
+	assert_eq(DeskGoals.stars("rage", {}, {"rage": 1}), 1, "the Rage Cage has desk stars")
+	assert_eq(DeskGoals.stars("rage", {}, {"rage": 30}, ["rage"]), 3)

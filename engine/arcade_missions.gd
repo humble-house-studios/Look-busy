@@ -1,5 +1,6 @@
 class_name ArcadeMissions
-## Missions on the arcade machines (claw, pusher, ragdoll): one at a time per
+## Missions on the arcade machines (claw, pusher, ragdoll; and the trading
+## floor's Rage Cage): one at a time per
 ## machine, each a plain goal the machine reports as it happens
 ## (event(machine, key, value): done when value reaches the mission's need).
 ## Finishing one pays its tickets and lights the next, so there's always
@@ -27,6 +28,13 @@ const LIST := {
 		{"key": "bell", "need": 1, "text": "RING THE BELL", "tickets": 40},
 		{"key": "perfects", "need": 3, "text": "3 PERFECTS IN A ROW (x1.5)", "tickets": 60},
 		{"key": "bell", "need": 3, "text": "RING THE BELL 3 TIMES IN A ROUND", "tickets": 100},
+	],
+	"rage": [
+		{"key": "pieces", "need": 5, "text": "KNOCK 5 PIECES OFF IN ONE PLAY", "tickets": 20},
+		{"key": "weak", "need": 1, "text": "HIT THE GLOWING WEAK SPOT", "tickets": 30},
+		{"key": "perfect", "need": 1, "text": "A PERFECT SWING (TOP OF THE METER)", "tickets": 40},
+		{"key": "glass", "need": 6, "text": "6 GLASS SHARDS OFF IN ONE PLAY", "tickets": 60},
+		{"key": "clean", "need": 1, "text": "CLEAN DESK: CLEAR THE WHOLE TABLE", "tickets": 100},
 	],
 }
 

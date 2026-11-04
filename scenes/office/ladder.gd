@@ -12,7 +12,8 @@ extends Node
 ##     tickets out; the ELEVATOR KEY unlocks the next floor. Ray's key sends
 ##     the elevator by the claw down to the basement ARCHIVE.
 ##   TRADING FLOOR (z 12-20): your tickets cash out as a portfolio; survive a
-##     trading week (a goal every day, perks after hours).
+##     trading week (a goal every day, perks after hours). The RAGE CAGE in
+##     the back corner smashes office machines; bad days pay free plays.
 ##   BOARDROOM (z 20-26): Dale is waiting at the end of the table. He's the founder
 ##     (the reveal, partway up). Then pitch the board, three yeses of five.
 ##   CORNER OFFICE (z 26-32): Dale's memo on the desk, a 3D mini-golf toy, and
@@ -296,6 +297,8 @@ func _cabinet(room: String, at: Vector3, rot_y: float, body_col: Color, title: S
 			_claw_shell(room, rig, body_col, title, title_col)
 		"pusher":
 			_pusher_shell(room, rig, body_col, title, title_col)
+		"rage":
+			_rage_shell(room, rig, body_col, title, title_col)
 		_:
 			_column_shell(room, rig, body_col, title, title_col)
 	# No screen: the game is the glass cage itself (built by the machine into
@@ -414,6 +417,39 @@ func _pusher_shell(room: String, rig: Node3D, body_col: Color, title: String, ti
 	_bulbs(room, rig, Vector3(-0.28, 1.96, -0.46), Vector3(0.28, 1.96, -0.46), 9)
 	_cyl(0.16, 0.04, Vector3(0, 2.52, -0.54), gold, rig, Vector3(PI / 2, 0, 0), 14)
 	_label("$", Vector3(0, 2.52, -0.515), 64, Color(0.5, 0.3, 0.0), rig)
+
+
+## RAGE CAGE (the trading floor's smash room; scenes/ladder/rage.gd builds the
+## inside: the desk, the machine to break, the hammer). A low base with a
+## hazard band and a coin door, chrome posts round a tall glass box, and a
+## red marquee with a warning beacon on top.
+func _rage_shell(room: String, rig: Node3D, body_col: Color, title: String, title_col: Color) -> void:
+	var body := _mat(room, body_col, 6, body_col.darkened(0.3), 30.0)
+	var chrome := _mat(room, Color(0.78, 0.8, 0.84), 6, Color(0.6, 0.62, 0.68), 90.0)
+	var dark := _mat(room, Color(0.04, 0.03, 0.03))
+	var stripes := _mat(room, Color(0.95, 0.78, 0.1), 2, Color(0.08, 0.08, 0.08), 30.0)
+	_box(Vector3(1.0, 0.82, 0.95), Vector3(0, 0.41, -0.03), body, true, Vector3.ZERO, rig)
+	_box(Vector3(1.02, 0.05, 0.97), Vector3(0, 0.025, -0.03), dark, false, Vector3.ZERO, rig)
+	_box(Vector3(1.0, 0.1, 0.012), Vector3(0, 0.68, 0.452), stripes, false, Vector3.ZERO, rig)
+	_coin_door(room, rig, Vector3(-0.28, 0.4, 0.452), 1)
+	_label("1 TOKEN = 3 SWINGS", Vector3(0.18, 0.47, 0.459), 12, Color(1.0, 0.85, 0.4), rig)
+	_label("BAD DAY? FREE PLAY", Vector3(0.18, 0.38, 0.459), 11, title_col.lightened(0.3), rig)
+	_label("TICKETS OUT", Vector3(0.18, 0.22, 0.459), 10, Color(1, 1, 1, 0.7), rig)
+	_box(Vector3(0.24, 0.04, 0.03), Vector3(0.18, 0.16, 0.46), dark, false, Vector3.ZERO, rig)
+	# Chrome posts and rails round the glass box.
+	for x in [-0.485, 0.485]:
+		for z in [0.43, -0.49]:
+			_box(Vector3(0.03, 1.06, 0.03), Vector3(x, 1.34, z), chrome, false, Vector3.ZERO, rig)
+		_box(Vector3(0.03, 0.03, 0.95), Vector3(x, 1.87, -0.03), chrome, false, Vector3.ZERO, rig)
+	_box(Vector3(1.0, 0.03, 0.03), Vector3(0, 1.87, 0.43), chrome, false, Vector3.ZERO, rig)
+	_box(Vector3(1.0, 0.012, 0.012), Vector3(0, 1.85, 0.45), _glow(room, title_col), false, Vector3.ZERO, rig)
+	# Marquee and a beacon.
+	_box(Vector3(1.0, 0.36, 0.14), Vector3(0, 2.08, -0.03), body, false, Vector3.ZERO, rig)
+	_box(Vector3(0.9, 0.28, 0.02), Vector3(0, 2.08, 0.045), _glow(room, title_col * 0.16), false, Vector3.ZERO, rig)
+	_label(title.replace("\n", " "), Vector3(0, 2.11, 0.058), 34, title_col.lightened(0.3), rig)
+	_label("STRESS RELIEF, APPROVED BY HR", Vector3(0, 2.0, 0.06), 8, Color(1, 1, 1, 0.8), rig)
+	_bulbs(room, rig, Vector3(-0.42, 2.24, 0.05), Vector3(0.42, 2.24, 0.05), 9)
+	_cyl(0.06, 0.08, Vector3(0, 2.3, -0.03), _glow(room, Color(1.0, 0.2, 0.1)), rig, Vector3.ZERO, 10)
 
 
 ## FALL GUY: a tall glass column floor to ceiling (scenes/ladder/ragdoll.gd
@@ -706,6 +742,9 @@ func _build_trading() -> void:
 	for x in [-2.6, 2.6]:
 		for i in 3:
 			var zz := z0 + 1.6 + i * 2.1
+			# The back-right desk made way for the Rage Cage.
+			if x > 0.0 and i == 2:
+				continue
 			_box(Vector3(1.3, 0.05, 0.7), Vector3(x, 0.74, zz), desk, true, Vector3.ZERO, p)
 			_box(Vector3(1.26, 0.7, 0.04), Vector3(x, 0.37, zz - 0.32), desk, true, Vector3.ZERO, p)
 			for k in [-0.3, 0.3]:
@@ -720,6 +759,8 @@ func _build_trading() -> void:
 	_box(Vector3(1.06, 0.7, 0.04), Vector3(0, 0.37, 0.33), desk, true, Vector3.ZERO, term)
 	_monitor(r, term, Vector3(0, 0.77, 0.12), Vector2(0.4, 0.71), "trading", "res://scenes/ladder/trading.gd", Color(0.2, 0.22, 0.24))
 	_label("TERMINAL 1", Vector3(0, 1.75, 0.0), 12, Color(0.4, 1.0, 0.5), term)
+	# The Rage Cage, where a trader's desk used to be: bad days pay free plays.
+	_cabinet(r, Vector3(2.93, 0, z0 + 5.8), -PI / 2, Color(0.18, 0.06, 0.06), "RAGE\nCAGE", Color(1.0, 0.3, 0.2), "rage", "res://scenes/ladder/rage.gd")
 
 
 func _build_boardroom() -> void:
@@ -1055,13 +1096,29 @@ func spend_token() -> bool:
 func win_tickets(n: int, machine: String, beats: bool) -> void:
 	state.win_tickets(n, machine)
 	if beats and state.beat(machine):
-		var names := {"claw": "CLAW KING", "pusher": "PUSH YOUR LUCK", "ragdoll": "FALL GUY"}
+		var names := {"claw": "CLAW KING", "pusher": "PUSH YOUR LUCK", "ragdoll": "FALL GUY", "rage": "RAGE CAGE"}
 		var msg := "MACHINE BEATEN: %s (%d/3)" % [names.get(machine, machine), state.beaten.size()]
+		if machine == "rage":
+			msg = "MACHINE BEATEN: RAGE CAGE.\nCLEAN DESK. YOU FEEL... BETTER?"
 		if state.beaten.size() == Coworkers.RAY_AFTER:
 			msg += "\nTHE LIGHTS DIM... SOMEONE'S MOPPING BY THE BACK WALL."
 		_toast(msg)
 		_refresh_people()
 	_refresh_machines()
+
+
+## One Rage Cage play: "stress" (free), "token", or "" (can't).
+func pay_rage() -> String:
+	var how := state.pay_rage()
+	_refresh_machines()
+	return how
+
+
+## A bad moment on the trading floor banks STRESS (free Rage Cage plays).
+func add_stress(n: int) -> int:
+	var got := state.add_stress(n)
+	_refresh_machines()
+	return got
 
 
 func buy(id: String) -> bool:

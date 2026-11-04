@@ -101,6 +101,8 @@ func _init() -> void:
 	await walk(Vector3(0, 0, 10.4), 13.6, 9.0)
 	check(ladder.room() == "trading", "and back up")
 	await tap_screen("trading")
+	# The Rage Cage in the back corner (where a trader's desk used to be).
+	await tap_screen("rage")
 	# Win the market the honest way: open it and trade the rumors.
 	var term = ladder._machines.trading.node
 	office._set_seat(ladder._machines.trading.pc)

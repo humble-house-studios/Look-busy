@@ -100,6 +100,21 @@ func test_progress_is_saved() -> void:
 	assert_eq(again.tokens, LadderState.PAYCHECK_BASE)
 
 
+func test_bad_trading_days_bank_free_rage_plays() -> void:
+	var l := LadderState.new(LADDER)
+	assert_eq(l.pay_rage(), "", "no stress, no tokens: no play")
+	assert_eq(l.add_stress(LadderState.STRESS_FIRED), LadderState.STRESS_FIRED)
+	l.tokens = 1
+	assert_eq(l.pay_rage(), "stress", "stress goes first, so it's free")
+	assert_eq(l.tokens, 1)
+	assert_eq(l.pay_rage(), "stress")
+	assert_eq(l.pay_rage(), "token", "then a token")
+	assert_eq(l.tokens, 0)
+	assert_eq(l.add_stress(99), LadderState.STRESS_MAX, "capped")
+	assert_eq(l.add_stress(1), 0)
+	assert_eq(LadderState.new(LADDER).stress, LadderState.STRESS_MAX, "saved")
+
+
 func test_objective_walks_the_rooms() -> void:
 	var l := LadderState.new(LADDER)
 	assert_string_contains(l.objective(0), "ELEVATOR")

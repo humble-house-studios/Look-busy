@@ -7,7 +7,8 @@ extends SceneTree
 ## Shots: the office elevator, riding it (doors shut, the floor ticking),
 ## the doors opening onto the arcade, the arcade, the claw and Gloria, playing the claw,
 ## the coin pusher, the Fall Guy column mid-bounce, talking to Gloria (line, replies,
-## answer), the prize counter, the trading floor and its terminal, the
+## answer), the prize counter, the trading floor and its terminal, the Rage
+## Cage (from the aisle, then a swing), the
 ## boardroom and the pitch, the corner office and the memo, the stage and the
 ## set list, the basement elevator, the archive, the top floor elevator. It wipes user://dale.cfg, ladder.cfg, coworkers.cfg.
 
@@ -119,6 +120,28 @@ func _init() -> void:
 	trade.node._buy(-1)
 	await _frames(30)
 	_shot("trading_play")
+	office._set_seat(null)
+	await _frames(20)
+	# The Rage Cage in the back corner: from the aisle, then one swing.
+	await _stand(Vector3(0.5, 0, 16.3), atan2(-2.4, -1.7), 0, -0.12)
+	_shot("rage")
+	var rage = office._ladder._machines.rage
+	office._set_seat(rage.pc)
+	await _frames(60)
+	office._ladder.state.add_stress(1)
+	rage.node._on_go()
+	await _frames(20)
+	rage.node._on_go()
+	rage.node._aim = Vector2(0.0, -0.02)
+	for i in 240:
+		await physics_frame
+		if rage.node._power > 0.9:
+			break
+	rage.node._on_go()
+	await _frames(14)
+	_shot("rage_smash")
+	await _frames(60)
+	_shot("rage_after")
 	office._set_seat(null)
 	await _frames(20)
 	await _stand(Vector3(1.6, 0, 20.9), PI + 0.35, 0, -0.05)

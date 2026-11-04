@@ -1,9 +1,10 @@
 extends SceneTree
-## Plays the glass-cage arcade machines (claw, coin pusher, Fall Guy) on
-## their own, no office, and prints PASS/FAIL: does the physics actually
-## work? Real claw grabs (strong ones should land prizes, weak ones mostly
-## slip), coins pushed off the edge pay out, the ragdoll bounces, stays in
-## its column and in one piece.
+## Plays the glass-cage machines (claw, coin pusher, Fall Guy, and the
+## trading floor's Rage Cage) on their own, no office, and prints PASS/FAIL:
+## does the physics actually work? Real claw grabs (strong ones should land
+## prizes, weak ones mostly slip), coins pushed off the edge pay out, the
+## ragdoll bounces, stays in its column and in one piece, and the Rage Cage's
+## hammer really breaks the machine into pieces that stay in the glass.
 ##   godot --headless --fixed-fps 60 -s res://tools/cage_check.gd
 ##   MACHINE=claw ...       one machine only
 ## With a display and OUT=/some/dir it also saves screenshots from the seat
@@ -20,6 +21,9 @@ class FakeHub extends Node:
 
 	func spend_token() -> bool:
 		return state.spend_token()
+
+	func pay_rage() -> String:
+		return state.pay_rage()
 
 	func win_tickets(n: int, machine: String, beats: bool) -> void:
 		if machine != "":
@@ -66,7 +70,7 @@ func _init() -> void:
 	root.add_child(cam)
 	cam.current = true
 	var only := OS.get_environment("MACHINE")
-	for id in ["claw", "pusher", "ragdoll"]:
+	for id in ["claw", "pusher", "ragdoll", "rage"]:
 		if only == "" or only == id:
 			await call("_" + id)
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
@@ -256,4 +260,65 @@ func _ragdoll() -> void:
 	check(apart < 0.03, "he stays in one piece (gap %.3f)" % apart)
 	check(m._last_score >= ArcadeRules.RAGDOLL_BEAT, "perfect timing beats the machine (%d)" % m._last_score)
 	await _shot("ragdoll_end")
+	await _done(parts)
+
+
+# ---------------------------------------------------------------- rage cage
+
+func _rage() -> void:
+	var parts := await _machine("rage")
+	var m = parts[0]
+	await frames(90)
+	await _shot("rage_idle")
+	var before: int = hub.wins.size()
+	var stray := 0
+	var worst_ms := 0.0
+	var after_first := 0
+	var tickets_before: int = hub.state.tickets
+	for play in 2:
+		m._on_go()
+		check(m._state == m.S.AIM, "a play starts (play %d)" % (play + 1))
+		for swing in ArcadeRules.RAGE_SWINGS:
+			await frames(20)
+			m._on_go()
+			# Aim at the front of whatever's on the desk, strike near the top.
+			m._aim = Vector2(0.02 * (swing - 1), -0.02)
+			var t := 0
+			while m._power < 0.92 and t < 240:
+				await physics_frame
+				t += 1
+			if play == 0 and swing == 0:
+				await _shot("rage_power")
+			m._on_go()
+			while m._state == m.S.STRIKE:
+				await physics_frame
+			await physics_frame
+			worst_ms = maxf(worst_ms, m.impact_ms)
+			if play == 0 and swing == 0:
+				after_first = m._bodies.size()
+				await frames(6)
+				await _shot("rage_smash")
+			while m._state == m.S.RECOVER:
+				await physics_frame
+				for b in m._bodies:
+					if is_instance_valid(b) and (b.position.y < m.FLOOR - 0.05 or absf(b.position.x) > m.HALF_X + 0.02 \
+							or b.position.z > m.GLASS_Z + 0.02 or b.position.z < m.BACK - 0.02 or b.position.y > m.TOP + 0.05):
+						stray += 1
+						if stray < 6:
+							print("      stray piece at %s v %s glass %s" % [b.position, b.linear_velocity, b.get_meta("glass", false)])
+		if play == 0:
+			await _shot("rage_after")
+		var t := 0
+		while m._state != m.S.IDLE and t < 600:
+			await physics_frame
+			t += 1
+		check(m._state == m.S.IDLE, "the play ends and a new machine sits on the desk (play %d)" % (play + 1))
+	var paid: int = hub.state.tickets - tickets_before
+	print("      rage: %d bodies after the first swing, %d payouts, %d tickets over 2 plays, slowest break %.1f ms" % [after_first, hub.wins.size() - before, paid, worst_ms])
+	check(after_first >= 8, "the first full swing breaks the machine into pieces (%d)" % after_first)
+	check(hub.wins.size() > before and paid > 0, "pieces knocked off the desk pay out (%d tickets)" % paid)
+	check(stray == 0, "every piece stays inside the glass (%d frames out)" % stray)
+	check(m._whole != null, "a fresh machine is waiting")
+	check(m._bodies.size() <= m.MAX_BODIES, "the piece count stays capped (%d)" % m._bodies.size())
+	await _shot("rage_end")
 	await _done(parts)

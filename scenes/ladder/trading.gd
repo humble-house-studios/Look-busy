@@ -385,6 +385,7 @@ func _process(delta: float) -> void:
 						sfx("thump", 0.0)
 						_shake = 0.6
 						banner("FLASH CRASH!", 1.2, RED)
+						_stress(LadderState.STRESS_CRASH)
 					elif ev.get("kind", "") == "bull":
 						sfx("cheer", -6.0)
 						banner("BULL RUN!", 1.2, GREEN)
@@ -451,8 +452,21 @@ func _bell() -> void:
 		sfx("chime", -2.0, 0.7)
 	else:
 		sfx("sad_trombone", -4.0)
+	if not r.cleared and not r.saved:
+		_stress(LadderState.STRESS_FIRED)
+	elif float(r.made) < 0.0:
+		_stress(LadderState.STRESS_RED_DAY)
 	_show("shop")
 	_refresh_shop()
+
+
+## A bad moment banks STRESS: free plays at the Rage Cage in the corner.
+func _stress(n: int) -> void:
+	if hub == null or not hub.has_method("add_stress"):
+		return
+	var got: int = hub.add_stress(n)
+	if got > 0:
+		_pop("+%d STRESS: FREE SWINGS AT THE RAGE CAGE" % got, Color(1.0, 0.45, 0.35), 20, 70.0)
 
 
 func _day_word() -> String:

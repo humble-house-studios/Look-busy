@@ -469,6 +469,36 @@ def make_lift():
     write_wav("lift_doors", slide * 0.7 + bump, 0.4)
 
 
+def make_rage():
+    """The Rage Cage on the trading floor: a sledgehammer crunching plastic
+    and a CRT's glass shattering. Own random generator, after everything else,
+    so every sound above stays byte-for-byte the same."""
+    rng = np.random.default_rng(404)
+
+    def burst(dur):
+        return rng.uniform(-1, 1, int(SR * dur))
+
+    # Smash: a low body thud, then a crackle of breaking plastic.
+    dur = 0.55
+    smash = np.sin(2 * np.pi * np.cumsum(np.geomspace(140, 45, int(SR * dur))) / SR) * decay(dur, 0.09) * 0.9
+    crack = shape(burst(dur), [(900, 500, 1.0), (2600, 900, 0.6)], 0.0)
+    grains = (rng.uniform(0, 1, len(crack)) > 0.985).astype(float)
+    smash += crack * decay(dur, 0.07, 0.001) * 0.6
+    smash += shape(grains * burst(dur), [(1800, 1200, 1.0)], 0.0) * decay(dur, 0.18) * 1.4
+    write_wav("rage_smash", smash, 0.75)
+
+    # Shatter: a bright burst of glass, then tinkling pieces landing.
+    dur = 1.1
+    shatter = highpass(burst(dur), 2500) * decay(dur, 0.06, 0.001) * 0.8
+    for i in range(14):
+        f0 = rng.uniform(2800, 6200)
+        d = rng.uniform(0.08, 0.25)
+        t = t_axis(d)
+        ping = sum(np.sin(2 * np.pi * f0 * k * t) * a for k, a in ((1, 1.0), (1.47, 0.5), (2.09, 0.25))) * decay(d, d * 0.3, 0.001)
+        place(shatter, ping, rng.uniform(0.02, 0.85), rng.uniform(0.15, 0.4))
+    write_wav("rage_shatter", reverb(shatter, 0.15, 0.4, 0.08), 0.6)
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     make_sfx()
@@ -476,6 +506,7 @@ if __name__ == "__main__":
     make_office()
     make_look_busy()
     make_lift()
+    make_rage()
     for f in sorted(os.listdir(OUT)):
         if not f.endswith(".import"):
             print(f"{f:20s} {os.path.getsize(os.path.join(OUT, f)) // 1024} KB")

@@ -253,6 +253,19 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   tested in `tests/test_arcade.gd`; `godot --headless --fixed-fps 60 -s
   res://tools/arcade_tune.gd` plays each machine at three skill levels and
   prints tickets per token (aim ~10-15 new, ~25-40 good; DOOR KEY is 300). The
+  **Rage Cage** (`scenes/ladder/rage.gd`, shell `_rage_shell()`): a glass
+  smash room on the trading floor (back-right corner, where a trader desk
+  was). A CRT, the printer or the coffee maker on a little desk; a play is 3
+  swings (tap to lock the aim, tap at the top of the power meter). Real
+  Voronoi fracture of each part (`engine/fracture.gd`, plain plane maths, no
+  addon, tested in `tests/test_fracture.gd`): pieces are convex bodies, so
+  they break again; fresh faces show the guts. Pieces off the desk pay
+  tickets (glass x2), CLEAN DESK beats it. A play costs a token or one
+  STRESS (`LadderState.add_stress`: flash crash +1, red day +1, fired +2,
+  banked by `trading.gd`). Numbers `ArcadeRules.RAGE_*`; capped at 90 bodies
+  for phones; nothing solid sits in front of the glass (taps would hit it).
+  `cage_check.gd` plays it (`MACHINE=rage`, `RAGE_DEBUG=1` prints each swing).
+  The
   corner-office golf (CORNER LINKS, 3 holes) still builds its own little world
   on its screen with `scenes/ladder/view3d.gd` (`retro_post.gdshader`
   grain/scanlines); `tools/machine_shot.gd` shoots it on its own. Rooms get their own lights

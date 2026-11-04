@@ -57,6 +57,26 @@ const RAGDOLL_BELL := 100
 ## The bell gives a bounce back, up to this many times a round.
 const RAGDOLL_BELL_KICKS := 2
 
+## Rage Cage (trading floor): a sledgehammer, an office machine, a glass
+## box. A play is RAGE_SWINGS swings; it costs a token, or one STRESS (free,
+## earned by bad days on the trading floor, LadderState.add_stress). Every
+## piece knocked off the table pays; glass pays double. Clear the whole
+## table (CLEAN DESK) for the bonus and to beat the machine.
+const RAGE_SWINGS := 3
+const RAGE_PIECE := 1
+const RAGE_GLASS := 2
+const RAGE_CLEAN := 25
+## The table counts as clean when less than this share of the machine's
+## volume is still on it.
+const RAGE_CLEAN_LEFT := 0.12
+## Power at or above this is a PERFECT swing (the meter's top band).
+const RAGE_PERFECT := 0.88
+## Hitting the glowing weak spot multiplies the swing's power.
+const RAGE_WEAK_X := 1.5
+## Pieces one swing breaks a part into: from a tap to a perfect crit.
+const RAGE_CELLS_MIN := 2
+const RAGE_CELLS_MAX := 7
+
 
 ## Is the next grab (0-based count of grabs so far) a full-strength one?
 static func claw_strong(grabs: int) -> bool:
@@ -136,3 +156,17 @@ static func pusher_streak_x(streak: int) -> int:
 
 static func ragdoll_tickets(score: int) -> int:
 	return score / RAGDOLL_POINTS_PER_TICKET
+
+
+## How many pieces a swing of `power` (0-1, after the weak-spot boost)
+## breaks a part into, by how close the part is to the hit (`near` 0-1).
+static func rage_cells(power: float, near: float) -> int:
+	var p := clampf(power, 0.0, 1.5) * clampf(near, 0.0, 1.0)
+	if p < 0.12:
+		return 1
+	return clampi(int(round(lerpf(RAGE_CELLS_MIN, RAGE_CELLS_MAX, minf(p, 1.0)) + maxf(0.0, p - 1.0) * 6.0)), RAGE_CELLS_MIN, RAGE_CELLS_MAX + 3)
+
+
+## One play's tickets: pieces off the table, glass pieces, CLEAN DESK.
+static func rage_tickets(pieces: int, glass: int, clean: bool) -> int:
+	return pieces * RAGE_PIECE + glass * RAGE_GLASS + (RAGE_CLEAN if clean else 0)

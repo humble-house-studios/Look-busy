@@ -38,6 +38,12 @@ const PRIZES := [
 const MARKET_BASE_CASH := 1000
 const MARKET_PER_TICKET := 5
 const MARKET_GOAL := 2.0
+## Bad moments on the trading floor bank STRESS: a free play of the Rage
+## Cage each (a flash crash, a red day, getting fired). Capped.
+const STRESS_CRASH := 1
+const STRESS_RED_DAY := 1
+const STRESS_FIRED := 2
+const STRESS_MAX := 9
 const SECRETS_TOTAL := 5
 
 var tokens := 0
@@ -55,6 +61,8 @@ var plays := 0
 ## Milestones: entered, market, reveal, pitch, memo, archive, stage.
 var done: Array[String] = []
 var market_cash := 0
+## Free Rage Cage plays, banked by bad trading days.
+var stress := 0
 
 var _path: String
 
@@ -92,6 +100,24 @@ func spend_token() -> bool:
 	plays += 1
 	save()
 	return true
+
+
+## Bank STRESS (capped). Returns how much actually went in.
+func add_stress(n: int) -> int:
+	var before := stress
+	stress = clampi(stress + n, 0, STRESS_MAX)
+	save()
+	return stress - before
+
+
+## One Rage Cage play: free with STRESS, else a token. "" if you can't.
+func pay_rage() -> String:
+	if stress > 0:
+		stress -= 1
+		plays += 1
+		save()
+		return "stress"
+	return "token" if spend_token() else ""
 
 
 ## A play back (the coin pusher's token chip).
@@ -250,6 +276,7 @@ func load_save() -> void:
 	paid = bool(cfg.get_value("ladder", "paid", false))
 	plays = int(cfg.get_value("ladder", "plays", 0))
 	market_cash = int(cfg.get_value("ladder", "market_cash", 0))
+	stress = int(cfg.get_value("ladder", "stress", 0))
 	items.clear()
 	for s in cfg.get_value("ladder", "items", []):
 		items.append(str(s))
@@ -270,6 +297,7 @@ func save() -> void:
 	cfg.set_value("ladder", "paid", paid)
 	cfg.set_value("ladder", "plays", plays)
 	cfg.set_value("ladder", "market_cash", market_cash)
+	cfg.set_value("ladder", "stress", stress)
 	cfg.set_value("ladder", "items", Array(items))
 	cfg.set_value("ladder", "beaten", Array(beaten))
 	cfg.set_value("ladder", "best", best)
