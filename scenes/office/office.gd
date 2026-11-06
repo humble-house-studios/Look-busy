@@ -132,6 +132,13 @@ const SEAT_FOV := 50.0
 const SEAT_FILL := 0.94
 ## How far in front of a screen you stand when you get up from its desk.
 const STAND_BACK := 0.8
+## Arcade cages are big (their "screen" is the whole glass front), so getting
+## up from one puts you further back, with room to turn and walk off.
+const STAND_BACK_CAGE := 1.6
+## Touch: a tap on a screen sits you there only if it's a real tap (quick,
+## barely moved). Drags to walk or look never sit you, even over a big cage.
+const TAP_SLOP := 24.0
+const TAP_TIME := 0.35
 ## Controller: look speed (radians per second at full tilt), stick deadzone,
 ## and how far away A still sits you down at the nearest computer.
 const PAD_LOOK := 2.4
@@ -331,6 +338,8 @@ var _zoom := 0.0
 var _touch := false
 ## Touch index -> "move" / "look" / "screen".
 var _touches := {}
+## A press that may turn into tap-to-sit: {index, pc, pos, time}.
+var _tap := {}
 ## The computer a held click/tap is pressing on.
 var _press_pc: Computer
 ## The computer the crosshair last hovered.
@@ -2557,6 +2566,7 @@ func _set_seat(pc: Computer) -> void:
 	_glide_time = 0.5 + 0.12 * _glide_from.origin.distance_to(pc.screen.global_position) if pc else 0.5
 	_glide = 0.0
 	_touches.clear()
+	_tap = {}
 	_stick = Vector2.ZERO
 	_pad_move = Vector2.ZERO
 	_pad_look = Vector2.ZERO
@@ -2570,9 +2580,10 @@ func _set_seat(pc: Computer) -> void:
 		var xf := pc.screen.global_transform
 		var fwd := xf.basis.z.normalized()
 		_player.velocity = Vector3.ZERO
-		_player.global_position = Vector3(xf.origin.x, 0.0, xf.origin.z) + Vector3(fwd.x, 0, fwd.z).normalized() * STAND_BACK
+		var back := STAND_BACK_CAGE if pc.overlay else STAND_BACK
+		_player.global_position = Vector3(xf.origin.x, 0.0, xf.origin.z) + Vector3(fwd.x, 0, fwd.z).normalized() * back
 		_yaw = atan2(fwd.x, fwd.z)
-		_pitch = -0.3
+		_pitch = -0.12 if pc.overlay else -0.3
 	elif old:
 		old.release()
 	if old:
@@ -2701,7 +2712,7 @@ func _process(delta: float) -> void:
 	_head.rotation.x = _pitch
 	# Lean in a bit while looking at the monitor up close.
 	var aim = _aim_at(_aim_point())
-	var close: bool = aim != null and aim.dist < REACH and _seat == null and not _talking
+	var close: bool = aim != null and aim.dist < REACH and not aim.pc.overlay and _seat == null and not _talking
 	_zoom = move_toward(_zoom, 1.0 if close else 0.0, delta * 2.5)
 	var walk_fov := lerpf(70.0, 52.0, _zoom * _zoom * (3.0 - 2.0 * _zoom))
 	# Glide between the walking view and the seated view.
@@ -3174,15 +3185,18 @@ func _touch_input(event: InputEvent) -> void:
 			elif _dale_hit(event.position) >= 0.0 and _glide >= 1.0 \
 					and (aim == null or _dale_hit(event.position) < aim.dist):
 				_set_talk(true, _hit_who)
-			elif aim != null and _glide >= 1.0:
-				# Tap a computer from anywhere to sit down at it.
-				_set_seat(aim.pc)
-			elif event.position.x < _hud.size.x * 0.45 and not _touches.values().has("move"):
-				_touches[i] = "move"
-				_stick_origin = event.position
-				_stick = Vector2.ZERO
 			else:
-				_touches[i] = "look"
+				# Tap a computer from anywhere to sit down at it, but only on a
+				# real tap (checked on release): a finger that drags to walk or
+				# look never sits you, even with a big arcade cage in view.
+				if aim != null and _glide >= 1.0 and _tap.is_empty():
+					_tap = {"index": i, "pc": aim.pc, "pos": event.position, "time": Time.get_ticks_msec()}
+				if event.position.x < _hud.size.x * 0.45 and not _touches.values().has("move"):
+					_touches[i] = "move"
+					_stick_origin = event.position
+					_stick = Vector2.ZERO
+				else:
+					_touches[i] = "look"
 		else:
 			var kind = _touches.get(i)
 			_touches.erase(i)
@@ -3190,7 +3204,16 @@ func _touch_input(event: InputEvent) -> void:
 				_release_press(event.position)
 			elif kind == "move":
 				_stick = Vector2.ZERO
+			if not _tap.is_empty() and _tap.index == i:
+				var pc: Computer = _tap.pc
+				var quick: bool = Time.get_ticks_msec() - int(_tap.time) < int(TAP_TIME * 1000.0)
+				var still: bool = event.position.distance_to(_tap.pos) < TAP_SLOP
+				_tap = {}
+				if quick and still and _seat == null and not _talking and pc.screen.is_visible_in_tree():
+					_set_seat(pc)
 		return
+	if not _tap.is_empty() and _tap.index == i and event.position.distance_to(_tap.pos) >= TAP_SLOP:
+		_tap = {}
 	match _touches.get(i):
 		"screen":
 			var uv = _seat_uv(event.position, _aim_at(event.position))
