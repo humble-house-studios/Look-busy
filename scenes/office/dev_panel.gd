@@ -18,6 +18,7 @@ var _scroll: ScrollContainer
 var _grids: Array[GridContainer] = []
 var _wipe: Button
 var _wipe_armed := false
+var _press_scroll := 0
 
 
 func setup(o: Node) -> void:
@@ -58,6 +59,8 @@ func setup(o: Node) -> void:
 	_scroll = ScrollContainer.new()
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	# A finger has to move a little before it scrolls, so taps still tap.
+	_scroll.scroll_deadzone = 16
 	col.add_child(_scroll)
 	var list := VBoxContainer.new()
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -194,7 +197,13 @@ func _button(t: String, action: Callable) -> Button:
 	down.bg_color = Color(0.35, 0.22, 0.12)
 	down.border_color = DEV_ORANGE
 	b.add_theme_stylebox_override("pressed", down)
+	# Drags start on buttons too (the list is mostly buttons): let the touch
+	# through to the scroll box, and don't fire a button the finger scrolled.
+	b.mouse_filter = Control.MOUSE_FILTER_PASS
+	b.button_down.connect(func(): _press_scroll = _scroll.scroll_vertical)
 	b.pressed.connect(func():
+		if absi(_scroll.scroll_vertical - _press_scroll) > 12:
+			return
 		action.call()
 		_refresh())
 	return b

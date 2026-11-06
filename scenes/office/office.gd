@@ -1945,6 +1945,11 @@ func _open_menu(by_pad: bool) -> void:
 
 ## A Look Busy pop-up is opening: let go of the mouse, the sticks and any press.
 func release_for_overlay() -> void:
+	# A pop-up that pauses the game (NEW DISK!, Look Busy's notices) must not
+	# open hidden behind the DEV panel: the pause would leave the panel's
+	# buttons dead and the pop-up out of sight (it looked like a freeze).
+	if _dev_open():
+		_dev.close()
 	if _press_pc:
 		_press_pc.release()
 		_press_pc = null
