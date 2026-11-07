@@ -1,4 +1,4 @@
-extends "res://scenes/ladder/machine.gd"
+extends "res://addons/hh_minigames/_shared/machine.gd"
 ## The basement archive terminal: games the studio shelved, each with a note
 ## that fills in the founder's story. Ray's key opens the door; finding this
 ## room counts toward the true ending.

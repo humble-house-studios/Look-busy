@@ -1,4 +1,4 @@
-extends "res://scenes/ladder/machine.gd"
+extends "res://addons/hh_minigames/_shared/machine.gd"
 ## The prize counter: spend tickets on the DOOR KEY (opens the trading floor)
 ## and on gifts your coworkers want. The petty-cash jar refills you when
 ## you're out of tokens, so you can never get stuck. Below, YOUR STUFF lists

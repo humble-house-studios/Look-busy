@@ -50,8 +50,8 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
 - Game logic in `res://engine/`, with no scene dependencies, tested headless
   with GUT.
 - Cards, audiences and map nodes are `.tres` Resources in `res://data/`.
-- All game numbers in `res://engine/balance.gd` so they can be tuned in one place.
-- Balance check: `godot --headless -s res://tools/tune.gd` plays 300 autopilot
+- All game numbers in `res://addons/hh_minigames/standup/engine/balance.gd` so they can be tuned in one place.
+- Balance check: `godot --headless -s res://addons/hh_minigames/standup/tools/tune.gd` plays 300 autopilot
   runs and prints win rates per set (`TUNE="open_mic=8000:60"` = laughs:seconds).
 - Screenshots: `tools/screenshot.gd` renders a live set under xvfb (see its header),
   so layout changes can be checked in both orientations before pushing.
@@ -221,7 +221,7 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   personalities to learn; rumors count down to news, a quarter are fake;
   profits in a row pay a HOT HAND bonus. Clearing Friday opens the boardroom;
   the record (most days in one run) is the desk's stars. Balance:
-  `godot --headless -s res://tools/market_tune.gd` (bots: idle 0%, blind
+  `godot --headless -s res://addons/hh_minigames/trading/tools/market_tune.gd` (bots: idle 0%, blind
   rumor ~13%, skilled ~60% clear Friday). **The arcade cabinets
   are glass cages, not screens:** the claw machine, coin pusher and Fall Guy
   are built straight into the arcade's 3D world (`scenes/ladder/cage3d.gd`:

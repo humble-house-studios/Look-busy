@@ -35,14 +35,14 @@ const PRIZES := [
 ## Trading floor: you start with this plus your leftover tickets, then survive
 ## a trading week (engine/market.gd: a goal every day). MARKET_GOAL is the
 ## old "double it" target, kept for what it shows.
-const MARKET_BASE_CASH := 1000
+const MARKET_BASE_CASH := Market.BASE_CASH
 const MARKET_PER_TICKET := 5
 const MARKET_GOAL := 2.0
 ## Bad moments on the trading floor bank STRESS: a free play of the Rage
 ## Cage each (a flash crash, a red day, getting fired). Capped.
-const STRESS_CRASH := 1
-const STRESS_RED_DAY := 1
-const STRESS_FIRED := 2
+const STRESS_CRASH := Market.STRESS_CRASH
+const STRESS_RED_DAY := Market.STRESS_RED_DAY
+const STRESS_FIRED := Market.STRESS_FIRED
 const STRESS_MAX := 9
 const SECRETS_TOTAL := 5
 

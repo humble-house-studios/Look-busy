@@ -10,7 +10,7 @@ extends Control
 ## busy_notice.gd; it runs PROCESS_MODE_ALWAYS. One 88 px button, so touch,
 ## mouse and the pad cursor all work.
 
-const FONT := preload("res://fonts/press_start_2p.ttf")
+const FONT := preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
 const Floppy := preload("res://scenes/office/floppy.gd")
 const GOLD := Color(1.0, 0.82, 0.35)
 const PAPER := Color(0.93, 0.92, 0.96)
@@ -182,9 +182,9 @@ func _show(e: Dictionary) -> void:
 					have = have and gm.has(n)
 				lines.append("+ %s = %s %s%s" % [" + ".join(c.others), c.name, c.text, "  (GOT IT!)" if have else ""])
 		_info.text = "\n".join(lines)
-		_play(preload("res://audio/coin.wav"), -2.0)
+		_play(preload("res://addons/hh_minigames/_shared/audio/coin.wav"), -2.0)
 		if e.first:
-			_player2.stream = preload("res://audio/fanfare.wav")
+			_player2.stream = preload("res://addons/hh_minigames/_shared/audio/fanfare.wav")
 			_player2.volume_db = -6.0
 			_player2.play()
 	else:
@@ -199,7 +199,7 @@ func _show(e: Dictionary) -> void:
 			_floppies[i].set_piece(GameMaker.kind_of(n), n)
 		_name.text = e.name
 		_info.text = "SCORE %s\nYOUR GAME: %s\nBUILD SCORE: %d" % [DiskBinder.combo_text(c), gm.title(), int(gm.score().score)]
-		_play(preload("res://audio/jackpot.wav"), -4.0)
+		_play(preload("res://addons/hh_minigames/_shared/audio/jackpot.wav"), -4.0)
 	_name.add_theme_color_override("font_color", GOLD if e.type == "combo" else PAPER)
 	if not visible:
 		_was_paused = get_tree().paused
@@ -208,7 +208,7 @@ func _show(e: Dictionary) -> void:
 	office.release_for_overlay()
 	_layout()
 	if _cursor == null:
-		_cursor = preload("res://scenes/pad_cursor.gd").new()
+		_cursor = preload("res://addons/hh_minigames/_shared/pad_cursor.gd").new()
 		add_child(_cursor)
 	_cursor.focus.call_deferred(_ok)
 	_cursor.active = office._pad

@@ -316,7 +316,7 @@ func _cabinet(room: String, at: Vector3, rot_y: float, body_col: Color, title: S
 	screen.position = seat.at
 	screen.rotation.x = seat.tilt
 	rig.add_child(screen)
-	var cage := preload("res://scenes/ladder/cage3d.gd").new()
+	var cage := preload("res://addons/hh_minigames/_shared/cage3d.gd").new()
 	cage.name = machine + "_cage"
 	rig.add_child(cage)
 	_machine(machine, script, room, screen, seat.size, cage)
@@ -506,8 +506,7 @@ func _machine(id: String, script: String, room: String, screen: Node3D, size: Ve
 	office.add_child(vp)
 	office._view_bus[vp] = office._make_bus("Ladder")
 	var m: Control = load(script).new()
-	m.hub = self
-	m.cage = cage
+	m.start({"host": self, "cage": cage})
 	vp.add_child(m)
 	var pc = office._add_computer(screen, size, vp, MACHINE_PX, false, null, cage != null)
 	_machines[id] = {"vp": vp, "node": m, "pc": pc, "room": room, "active": false, "cage": cage}
@@ -627,9 +626,9 @@ func _build_arcade() -> void:
 		_box(Vector3(0.03, 0.05, 7.6), spec[0], _glow(r, spec[1]), false, Vector3.ZERO, p)
 	_label("THE BREAK ROOM ARCADE", Vector3(0, 2.66, ROOM_Z.trading - 0.17), 26, Color(1.0, 0.45, 0.8), p, Vector3(0, PI, 0))
 	_label("WIN TICKETS -> PRIZE COUNTER -> ELEVATOR KEY", Vector3(-0.5, 2.64, z0 + 0.12), 14, Color(0.4, 1.0, 0.9), p)
-	_cabinet(r, Vector3(-2.95, 0, 6.0), PI / 2, Color(0.45, 0.1, 0.35), "CLAW\nKING", Color(1.0, 0.45, 0.8), "claw", "res://scenes/ladder/claw.gd")
-	_cabinet(r, Vector3(-2.95, 0, 9.0), PI / 2, Color(0.5, 0.25, 0.08), "FALL\nGUY", Color(1.0, 0.65, 0.3), "ragdoll", "res://scenes/ladder/ragdoll.gd")
-	_cabinet(r, Vector3(2.95, 0, 7.2), -PI / 2, Color(0.06, 0.35, 0.35), "PUSH YOUR\nLUCK", Color(0.4, 1.0, 0.9), "pusher", "res://scenes/ladder/pusher.gd")
+	_cabinet(r, Vector3(-2.95, 0, 6.0), PI / 2, Color(0.45, 0.1, 0.35), "CLAW\nKING", Color(1.0, 0.45, 0.8), "claw", "res://addons/hh_minigames/claw/claw.gd")
+	_cabinet(r, Vector3(-2.95, 0, 9.0), PI / 2, Color(0.5, 0.25, 0.08), "FALL\nGUY", Color(1.0, 0.65, 0.3), "ragdoll", "res://addons/hh_minigames/fall_guy/ragdoll.gd")
+	_cabinet(r, Vector3(2.95, 0, 7.2), -PI / 2, Color(0.06, 0.35, 0.35), "PUSH YOUR\nLUCK", Color(0.4, 1.0, 0.9), "pusher", "res://addons/hh_minigames/pusher/pusher.gd")
 	# Prize counter: a long glass counter along the east wall, shelves of
 	# prizes behind it, a CRT on top that runs the shop.
 	var counter := Node3D.new()
@@ -764,10 +763,10 @@ func _build_trading() -> void:
 	p.add_child(term)
 	_box(Vector3(1.1, 0.05, 0.6), Vector3(0, 0.74, 0.05), desk, true, Vector3.ZERO, term)
 	_box(Vector3(1.06, 0.7, 0.04), Vector3(0, 0.37, 0.33), desk, true, Vector3.ZERO, term)
-	_monitor(r, term, Vector3(0, 0.77, 0.12), Vector2(0.4, 0.71), "trading", "res://scenes/ladder/trading.gd", Color(0.2, 0.22, 0.24))
+	_monitor(r, term, Vector3(0, 0.77, 0.12), Vector2(0.4, 0.71), "trading", "res://addons/hh_minigames/trading/trading.gd", Color(0.2, 0.22, 0.24))
 	_label("TERMINAL 1", Vector3(0, 1.75, 0.0), 12, Color(0.4, 1.0, 0.5), term)
 	# The Rage Cage, where a trader's desk used to be: bad days pay free plays.
-	_cabinet(r, Vector3(2.93, 0, z0 + 5.8), -PI / 2, Color(0.18, 0.06, 0.06), "RAGE\nCAGE", Color(1.0, 0.3, 0.2), "rage", "res://scenes/ladder/rage.gd")
+	_cabinet(r, Vector3(2.93, 0, z0 + 5.8), -PI / 2, Color(0.18, 0.06, 0.06), "RAGE\nCAGE", Color(1.0, 0.3, 0.2), "rage", "res://addons/hh_minigames/rage_cage/rage.gd")
 
 
 func _build_boardroom() -> void:
@@ -804,7 +803,7 @@ func _build_boardroom() -> void:
 	var screen := Node3D.new()
 	screen.position = Vector3(0, 1.45, 0.0)
 	rig.add_child(screen)
-	_machine("pitch", "res://scenes/ladder/pitch_screen.gd", r, screen, glass)
+	_machine("pitch", "res://addons/hh_minigames/pitch/pitch_screen.gd", r, screen, glass)
 	_label("Q3 PITCH MEETING", Vector3(-0.6, 2.4, z1 - 0.1), 16, Color(0.9, 0.85, 0.7), p, Vector3(0, PI, 0))
 	# A water jug, the sad bagels and a framed motto.
 	_cyl(0.07, 0.24, Vector3(-0.6, 0.92, z0 + 1.7), _mat(r, Color(0.6, 0.75, 0.9), 0, Color.BLACK, 24.0, Color(0.05, 0.08, 0.12)), p)
@@ -845,7 +844,7 @@ func _build_corner() -> void:
 	var leather := _mat(r, Color(0.15, 0.08, 0.06))
 	_box(Vector3(0.65, 0.1, 0.6), Vector3(0, 0.5, -0.85), leather, true, Vector3.ZERO, desk)
 	_box(Vector3(0.65, 0.9, 0.12), Vector3(0, 1.0, -1.12), leather, false, Vector3.ZERO, desk)
-	_monitor(r, desk, Vector3(-0.55, 0.795, -0.05), Vector2(0.24, 0.43), "putt", "res://scenes/ladder/putt.gd", Color(0.2, 0.2, 0.22))
+	_monitor(r, desk, Vector3(-0.55, 0.795, -0.05), Vector2(0.24, 0.43), "putt", "res://addons/hh_minigames/golf/putt.gd", Color(0.2, 0.2, 0.22))
 	# The memo: a folded sheet on the blotter, glowing a little so you notice it.
 	_box(Vector3(0.7, 0.01, 0.45), Vector3(0.2, 0.8, 0.1), _mat(r, Color(0.2, 0.3, 0.22)), false, Vector3.ZERO, desk)
 	_memo_node = Node3D.new()
@@ -920,7 +919,7 @@ func _build_stage() -> void:
 	rig.position = Vector3(-1.0, 0.26, sz0 + 0.45)
 	p.add_child(rig)
 	_cyl(0.02, 0.6, Vector3(0, 0.3, -0.05), metal, rig)
-	_monitor(r, rig, Vector3(0, 0.6, 0.0), Vector2(0.3, 0.53), "stage", "res://scenes/ladder/final_set.gd", Color(0.1, 0.1, 0.12))
+	_monitor(r, rig, Vector3(0, 0.6, 0.0), Vector2(0.3, 0.53), "stage", "res://addons/hh_minigames/open_mic/open_mic.gd", Color(0.1, 0.1, 0.12))
 	_label("ONE MORE SET?", Vector3(0, 1.32, -0.06), 12, Color(1.0, 0.4, 0.7), rig)
 	# Empty tables, dusty candles. Nobody's here. That's the point.
 	var table := _mat(r, Color(0.15, 0.1, 0.08))

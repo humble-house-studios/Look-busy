@@ -5,7 +5,7 @@ extends Control
 ## colour; the paper label has its kind on a dark band and its name in ink.
 ## A missing disk (not found yet) is a dashed outline with "???".
 
-const FONT := preload("res://fonts/press_start_2p.ttf")
+const FONT := preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
 const KIND_COLORS := {
 	"genre": Color(0.95, 0.45, 0.3), "mechanic": Color(0.35, 0.75, 1.0), "art": Color(0.75, 0.5, 1.0),
 	"sound": Color(0.4, 0.9, 0.55), "character": Color(1.0, 0.8, 0.35),

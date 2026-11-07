@@ -228,10 +228,10 @@ jobs:
           command -v git >/dev/null || (apt-get update -qq && apt-get install -y -qq git)
           tools/fetch_games.sh --autoloads
           godot --headless --import >/dev/null 2>&1 || true
-          sed -i 's#run/main_scene="res://scenes/main.tscn"#run/main_scene="res://scenes/office/office.tscn"#' project.godot
+          sed -i 's#run/main_scene="res://addons/hh_minigames/standup/main.tscn"#run/main_scene="res://scenes/office/office.tscn"#' project.godot
           mkdir -v -p build/web/office
           godot --headless --export-release "Web" build/web/office/index.html 2>&1 | tail -5
-          git checkout project.godot 2>/dev/null || sed -i 's#run/main_scene="res://scenes/office/office.tscn"#run/main_scene="res://scenes/main.tscn"#' project.godot
+          git checkout project.godot 2>/dev/null || sed -i 's#run/main_scene="res://scenes/office/office.tscn"#run/main_scene="res://addons/hh_minigames/standup/main.tscn"#' project.godot
           if [ ! -f build/web/office/index.html ]; then
             echo "::error title=Office export::no build/web/office/index.html"
             exit 1

@@ -6,7 +6,7 @@ extends Control
 ## coworkers, the Loot Machine's shared stats), so what it unlocks stays
 ## unlocked. WIPE puts everything back to a fresh start.
 
-const FONT := preload("res://fonts/press_start_2p.ttf")
+const FONT := preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
 const GOLD := Color(1.0, 0.85, 0.3)
 const DEV_ORANGE := Color(1.0, 0.55, 0.2)
 

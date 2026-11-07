@@ -12,7 +12,7 @@ extends Control
 
 signal clocked_in
 
-const FONT := preload("res://fonts/press_start_2p.ttf")
+const FONT := preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
 const YELLOW := Color(1.0, 0.86, 0.25)
 const INK := Color(0.08, 0.08, 0.1)
 ## The three rules, with the colour of the HUD bar each one maps to.
@@ -109,7 +109,7 @@ func open() -> void:
 		office.release_for_overlay()
 	_layout()
 	if _cursor == null:
-		_cursor = preload("res://scenes/pad_cursor.gd").new()
+		_cursor = preload("res://addons/hh_minigames/_shared/pad_cursor.gd").new()
 		add_child(_cursor)
 	_cursor.focus.call_deferred(_go)
 	_cursor.active = office != null and office._pad
@@ -317,7 +317,7 @@ class BusyDemo:
 	const LOOP := 13.0
 	const DOOR_X := 75.0
 	const STOP_X := 262.0
-	const FONT := preload("res://fonts/press_start_2p.ttf")
+	const FONT := preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
 	const SKIN := Color(0.92, 0.74, 0.6)
 	const BOSS_SHIRT := Color(0.62, 0.18, 0.24)
 	const MY_SHIRT := Color(0.2, 0.42, 0.75)

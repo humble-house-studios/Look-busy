@@ -25,7 +25,7 @@ func _init() -> void:
 	show.texture = vp.get_texture()
 	show.size = Vector2(720, 1280)
 	root.add_child(show)
-	var scr = load("res://scenes/ladder/%s.gd" % id)
+	var scr = load(HHMinigames.script_for(id))
 	if scr == null or not scr.can_instantiate():
 		quit(1)
 		return

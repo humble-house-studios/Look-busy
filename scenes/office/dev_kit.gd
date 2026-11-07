@@ -10,8 +10,8 @@ extends Control
 ## BINDER opens the collection: every disk ever found (engine/disk_binder.gd),
 ## and a STAR CARDS tab with every desk's stars (engine/desk_goals.gd).
 
-const FONT := preload("res://fonts/press_start_2p.ttf")
-const SMALL := preload("res://fonts/pixelify_sans.ttf")
+const FONT := preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
+const SMALL := preload("res://addons/hh_minigames/_shared/fonts/pixelify_sans.ttf")
 const Floppy := preload("res://scenes/office/floppy.gd")
 const W := 720.0
 const H := 1280.0
@@ -128,7 +128,7 @@ func _ready() -> void:
 	add_child(_ship)
 	_build_trailer()
 	_build_binder()
-	add_child(preload("res://scenes/pad_cursor.gd").new())
+	add_child(preload("res://addons/hh_minigames/_shared/pad_cursor.gd").new())
 	refresh()
 
 
@@ -154,7 +154,7 @@ func refresh() -> void:
 	_info.text = "%d PIECES THIS WEEK\n%s" % [gm.pieces.size(), "SHIPS TODAY 5 PM" if wd.is_friday() else "SHIPS FRIDAY 5 PM"]
 	_ship.visible = wd.is_friday()
 	if _last_score >= 0 and s.score > _last_score:
-		_play(preload("res://audio/ding.wav"), -4.0, 1.0 + minf(0.5, (s.score - _last_score) / 100.0))
+		_play(preload("res://addons/hh_minigames/_shared/audio/ding.wav"), -4.0, 1.0 + minf(0.5, (s.score - _last_score) / 100.0))
 	_last_score = s.score
 
 
@@ -183,7 +183,7 @@ func _cycle(kind: String) -> void:
 		gm.pick(kind, list[at + 1].name)
 	else:
 		gm.clear_slot(kind)
-	_play(preload("res://audio/click.wav"), -2.0)
+	_play(preload("res://addons/hh_minigames/_shared/audio/click.wav"), -2.0)
 	refresh()
 
 
@@ -238,9 +238,9 @@ func _next_card() -> void:
 	_trailer_label.pivot_offset = _trailer_label.size * 0.5
 	_trailer_label.modulate.a = 0.0
 	if _card_i == _cards.size() - 2:
-		_play(preload("res://audio/fanfare.wav"), -4.0)
+		_play(preload("res://addons/hh_minigames/_shared/audio/fanfare.wav"), -4.0)
 	else:
-		_play(preload("res://audio/thump.wav"), -2.0)
+		_play(preload("res://addons/hh_minigames/_shared/audio/thump.wav"), -2.0)
 
 
 func _process(delta: float) -> void:
@@ -355,14 +355,14 @@ func _build_binder() -> void:
 	close.size = Vector2(W - 40, 98)
 	close.pressed.connect(func():
 		_binder.visible = false
-		_play(preload("res://audio/click.wav"), -2.0))
+		_play(preload("res://addons/hh_minigames/_shared/audio/click.wav"), -2.0))
 	_binder.add_child(close)
 
 
 func open_binder() -> void:
 	_binder.visible = true
 	_set_tab(_binder_tab)
-	_play(preload("res://audio/click.wav"), -2.0)
+	_play(preload("res://addons/hh_minigames/_shared/audio/click.wav"), -2.0)
 
 
 func _set_tab(tab: String) -> void:

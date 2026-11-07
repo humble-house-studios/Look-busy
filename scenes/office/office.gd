@@ -8,7 +8,7 @@ extends Node
 ##   on its desktop (teal wallpaper, title bar, taskbar). Each game runs in
 ##   its own viewport; a second full-res pass draws only the game screens, so
 ##   they stay readable up close.
-##   - Main desk: this game (res://scenes/main.tscn) in a SubViewport.
+##   - Main desk: this game (res://addons/hh_minigames/standup/main.tscn) in a SubViewport.
 ##   - Side desk: Phone Pong (res://games/pong, pulled in by tools/fetch_games.sh):
 ##     its window is tall when the phone is upright and goes wide when it is
 ##     sideways (so Pong's paddle sits under the right thumb).
@@ -126,7 +126,7 @@ const STEP_DB := -10.0
 const LAYER_WORLD := 1
 const LAYER_SCREEN := 2
 const STICK_RADIUS := 90.0
-const SafeArea := preload("res://scenes/safe_area.gd")
+const SafeArea := preload("res://addons/hh_minigames/_shared/safe_area.gd")
 ## Seated view: fov, and how much of the view the screen fills.
 const SEAT_FOV := 50.0
 const SEAT_FILL := 0.94
@@ -153,7 +153,7 @@ const PAD_CARD := [
 	["BACK", "Leave a desk  (or hold B)"],
 	["Y", "Seated: alt-tab (Look Busy)"],
 ]
-const PadUI := preload("res://scenes/pad_cursor.gd")
+const PadUI := preload("res://addons/hh_minigames/_shared/pad_cursor.gd")
 ## The goal marker: warm yellow like the TO-DO, gone within ~1.5 m of what it
 ## marks (the hint takes over there), gliding to each new goal.
 const MARKER_COL := Color(1.0, 0.85, 0.3)
@@ -513,7 +513,9 @@ func _build_game() -> void:
 	_game_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	add_child(_game_vp)
 	_view_bus[_game_vp] = _make_bus("Comedy")
-	_game_vp.add_child(preload("res://scenes/main.tscn").instantiate())
+	var comedy := preload("res://addons/hh_minigames/standup/main.tscn").instantiate()
+	comedy.start({"dev": Dev.ON})
+	_game_vp.add_child(comedy)
 	if ResourceLoader.exists(LOOT_SCENE):
 		_loot_vp = SubViewport.new()
 		_loot_vp.size = LOOT_SIZE
@@ -743,7 +745,7 @@ func _cyl(radius: float, height: float, pos: Vector3, mat: Material, rot := Vect
 func _label(text: String, pos: Vector3, size: int, color: Color, rot := Vector3.ZERO, width := 0.0, parent: Node = null) -> Label3D:
 	var l := Label3D.new()
 	l.text = text
-	l.font = preload("res://fonts/press_start_2p.ttf")
+	l.font = preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
 	l.font_size = size
 	l.pixel_size = 0.002
 	l.modulate = color
@@ -1476,7 +1478,7 @@ func _ball(radius: float, pos: Vector3, mat: Material, parent: Node3D, squash :=
 ## The talk box: Dale's name and story file, his line typing out, and the
 ## replies (or NEXT) underneath.
 func _build_talk_box() -> void:
-	var font := preload("res://fonts/press_start_2p.ttf")
+	var font := preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
 	_talk_panel = PanelContainer.new()
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.07, 0.05, 0.1, 0.92)
@@ -1528,7 +1530,7 @@ func _talk_button(text: String, action: Callable) -> void:
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	b.add_theme_font_override("font", preload("res://fonts/press_start_2p.ttf"))
+	b.add_theme_font_override("font", preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf"))
 	b.add_theme_font_size_override("font_size", 19)
 	b.custom_minimum_size = Vector2(0, 88)
 	var normal := StyleBoxFlat.new()
@@ -2068,7 +2070,7 @@ func _build_marker() -> void:
 	_cyl(0.11, 0.16, Vector3(0, 0.08, 0), top, Vector3.ZERO, 4, 0.0, _marker_spin)
 	_cyl(0.11, 0.2, Vector3(0, -0.1, 0), low, Vector3(PI, 0, 0), 4, 0.0, _marker_spin)
 	_ding = AudioStreamPlayer.new()
-	_ding.stream = load("res://audio/ding.wav")
+	_ding.stream = load("res://addons/hh_minigames/_shared/audio/ding.wav")
 	_ding.volume_db = -6.0
 	_ding.bus = "Effects"
 	add_child(_ding)
@@ -2195,7 +2197,7 @@ func _draw_goal_arrow(size: Vector2) -> void:
 	var me := _player.global_position
 	var metres := int(roundf(Vector2(_goal_at.x - me.x, _goal_at.z - me.z).length()))
 	var label := "%d m" % metres
-	var font: Font = preload("res://fonts/press_start_2p.ttf")
+	var font: Font = preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
 	var fs := int(16 * k)
 	var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var tp := at - n * 48.0 * k + Vector2(-w * 0.5, fs * 0.5)
@@ -2330,7 +2332,7 @@ func _build_hud() -> void:
 	_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hud.draw.connect(_draw_hud)
 	add_child(_hud)
-	var font := preload("res://fonts/press_start_2p.ttf")
+	var font := preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
 	_hint = Label.new()
 	_hint.add_theme_font_override("font", font)
 	_hint.add_theme_font_size_override("font_size", 18)
@@ -2459,7 +2461,7 @@ func _hud_button(text: String, corner: Control.LayoutPreset) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_override("font", preload("res://fonts/press_start_2p.ttf"))
+	b.add_theme_font_override("font", preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf"))
 	b.add_theme_font_size_override("font_size", 22)
 	b.custom_minimum_size = Vector2(260, 96)
 	b.visible = false

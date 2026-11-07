@@ -4,7 +4,7 @@ extends Control
 ## ship day. It pauses the office while it's up and runs PROCESS_MODE_ALWAYS.
 ## Buttons are 88 px tall so touch, mouse and the pad cursor all work.
 
-const FONT := preload("res://fonts/press_start_2p.ttf")
+const FONT := preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
 const GREY := Color(0.76, 0.76, 0.74)
 const NAVY := Color(0.06, 0.14, 0.6)
 const INK := Color(0.08, 0.08, 0.1)
@@ -96,7 +96,7 @@ func show_notice(title: String, head: String, body: String, buttons: Array, acce
 		office.release_for_overlay()
 	_layout()
 	if _cursor == null:
-		_cursor = preload("res://scenes/pad_cursor.gd").new()
+		_cursor = preload("res://addons/hh_minigames/_shared/pad_cursor.gd").new()
 		add_child(_cursor)
 	if first:
 		_cursor.focus.call_deferred(first)

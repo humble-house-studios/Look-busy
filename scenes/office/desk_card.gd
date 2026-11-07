@@ -9,7 +9,7 @@ extends Control
 ## Stars already earned are remembered in user://desk_goals.cfg, so each
 ## celebration plays once (the first look at an old save just remembers).
 
-const FONT := preload("res://fonts/press_start_2p.ttf")
+const FONT := preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
 const SAVE_PATH := "user://desk_goals.cfg"
 const GOLD := Color(1.0, 0.82, 0.2)
 const CARD_H := 104.0
@@ -207,7 +207,7 @@ func _celebrate(what: Array) -> void:
 	_banner_text = [DeskGoals.star_text(k + 1), desk.name, "DONE: " + str(tier[2]).get_slice(":", 0)]
 	_banner_t = 3.2
 	_banner.visible = true
-	_player.stream = preload("res://audio/fanfare.wav") if k == 2 else preload("res://audio/jackpot.wav")
+	_player.stream = preload("res://addons/hh_minigames/_shared/audio/fanfare.wav") if k == 2 else preload("res://addons/hh_minigames/_shared/audio/jackpot.wav")
 	_player.volume_db = -3.0
 	_player.play()
 	var tot := DeskGoals.total(_numbers()[0], _numbers()[1], _numbers()[2])

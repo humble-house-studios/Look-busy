@@ -10,7 +10,7 @@ extends Control
 
 signal filled
 
-const FONT := preload("res://fonts/press_start_2p.ttf")
+const FONT := preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
 const NAVY := Color(0.06, 0.14, 0.6)
 const GREY := Color(0.76, 0.76, 0.74)
 const INK := Color(0.08, 0.08, 0.1)
@@ -37,13 +37,13 @@ func _ready() -> void:
 	_rng.randomize()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_click = AudioStreamPlayer.new()
-	_click.stream = preload("res://audio/click.wav")
+	_click.stream = preload("res://addons/hh_minigames/_shared/audio/click.wav")
 	add_child(_click)
 	_ding = AudioStreamPlayer.new()
-	_ding.stream = preload("res://audio/ding.wav")
+	_ding.stream = preload("res://addons/hh_minigames/_shared/audio/ding.wav")
 	_ding.volume_db = -6.0
 	add_child(_ding)
-	add_child(preload("res://scenes/pad_cursor.gd").new())
+	add_child(preload("res://addons/hh_minigames/_shared/pad_cursor.gd").new())
 	resized.connect(_build)
 	_build()
 

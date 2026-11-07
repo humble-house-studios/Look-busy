@@ -10,8 +10,8 @@ extends Control
 ## The office (office.gd) owns pausing, applying settings and the restart;
 ## this only builds the window and calls back.
 
-const PadUI := preload("res://scenes/pad_cursor.gd")
-const FONT := preload("res://fonts/press_start_2p.ttf")
+const PadUI := preload("res://addons/hh_minigames/_shared/pad_cursor.gd")
+const FONT := preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
 const ROW_H := 88
 const GREY := Color(0.76, 0.76, 0.74)
 const NAVY := Color(0.06, 0.14, 0.6)

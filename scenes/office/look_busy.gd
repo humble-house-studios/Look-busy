@@ -526,13 +526,13 @@ func _coast_clear(b: Dictionary) -> void:
 		return
 	office._toast.text = "%s IS GONE. COAST IS CLEAR!\nBACK TO PLAYING." % b.name
 	office._toast_time = 3.0
-	_play(preload("res://audio/chime.wav"), -6.0)
+	_play(preload("res://addons/hh_minigames/_shared/audio/chime.wav"), -6.0)
 
 
 func _quota_met() -> void:
 	office._toast.text = "SLACK QUOTA MET! (%s)\nEVERY EXTRA MINUTE IS RESEARCH FOR YOUR GAME." % Workday.hours_text(wd.quota())
 	office._toast_time = 4.0
-	_play(preload("res://audio/jackpot.wav"), -4.0)
+	_play(preload("res://addons/hh_minigames/_shared/audio/jackpot.wav"), -4.0)
 
 
 ## Alt-tabbed with the boss right on you and got away with it.
@@ -541,7 +541,7 @@ func _close_call() -> void:
 	var met := wd.close_call()
 	office._toast.text = "CLOSE CALL! +%s SLACKED" % Workday.hours_text(Workday.CLOSE_CALL)
 	office._toast_time = 2.5
-	_play(preload("res://audio/ding.wav"), -2.0)
+	_play(preload("res://addons/hh_minigames/_shared/audio/ding.wav"), -2.0)
 	if met:
 		_quota_met()
 
@@ -821,7 +821,7 @@ func _ship_pay(r: Dictionary) -> void:
 		body += "You need a press average of %s and to beat Theo. Another week on floor %d." % [ShipDay.fmt(ShipDay.PROMOTE_AT), wd.floor_i]
 	notice.show_notice("PAYROLL.EXE", head, body, [[button, _new_week.bind(r.promoted)]], Color(0.1, 0.5, 0.2) if r.promoted else Color(0.4, 0.3, 0.1))
 	if r.promoted:
-		_play(preload("res://audio/fanfare.wav"), -2.0)
+		_play(preload("res://addons/hh_minigames/_shared/audio/fanfare.wav"), -2.0)
 
 
 func _new_week(promote: bool) -> void:
@@ -905,7 +905,7 @@ func alt_tab() -> void:
 	_sheet.open(wd.cells_today)
 	pc.set_cover(_sheet_vp)
 	_covered = pc
-	_play(preload("res://audio/click.wav"), -4.0)
+	_play(preload("res://addons/hh_minigames/_shared/audio/click.wav"), -4.0)
 	if not _close_done and _boss_close() and not wd.in_grace() and wd.suspicion < Workday.MAX_SUSPICION:
 		_close_call()
 
@@ -960,7 +960,7 @@ func _place_hud() -> void:
 
 
 func _draw_hud() -> void:
-	var font: Font = preload("res://fonts/press_start_2p.ttf")
+	var font: Font = preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
 	var w := HUD_W
 	var watched := _seen and _activity() != "working"
 	var blink := fmod(Time.get_ticks_msec() / 250.0, 2.0) < 1.0

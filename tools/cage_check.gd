@@ -83,9 +83,9 @@ func _init() -> void:
 func _machine(id: String) -> Array:
 	var rig := Node3D.new()
 	root.add_child(rig)
-	var cage := preload("res://scenes/ladder/cage3d.gd").new()
+	var cage := preload("res://addons/hh_minigames/_shared/cage3d.gd").new()
 	rig.add_child(cage)
-	var scr = load("res://scenes/ladder/%s.gd" % id)
+	var scr = load(HHMinigames.script_for(id))
 	var layer := CanvasLayer.new()
 	root.add_child(layer)
 	var vp := SubViewport.new()

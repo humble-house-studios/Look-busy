@@ -2,7 +2,7 @@
 
 Run from the project root:  python3 tools/make_audio.py
 Writes short sound effects as WAV and the lounge music loop as OGG (via
-ffmpeg) into audio/. Needs numpy and ffmpeg.
+ffmpeg) into audio/ and the mini game addon (addons/hh_minigames). Needs numpy and ffmpeg.
 """
 import os
 import subprocess
@@ -11,7 +11,26 @@ import wave
 import numpy as np
 
 SR = 22050
-OUT = os.path.join(os.path.dirname(__file__), "..", "audio")
+ROOT = os.path.join(os.path.dirname(__file__), "..")
+OUT = os.path.join(ROOT, "audio")
+# Sounds the mini games use go into the shared addon (addons/hh_minigames);
+# the office's own stay in audio/.
+MINI = os.path.join(ROOT, "addons", "hh_minigames")
+SHARED = {"laugh_small", "laugh_big", "laugh_huge", "applause", "cheer", "crickets",
+          "groan", "rimshot", "sad_trombone", "fanfare", "click", "card", "chime",
+          "thump", "ding", "coin", "jackpot"}
+DIRS = [OUT, os.path.join(MINI, "_shared", "audio"), os.path.join(MINI, "standup", "audio"),
+        os.path.join(MINI, "rage_cage", "audio")]
+
+
+def out_for(name):
+    if name in SHARED:
+        return DIRS[1]
+    if name.startswith("music"):
+        return DIRS[2]
+    if name.startswith("rage_"):
+        return DIRS[3]
+    return OUT
 RNG = np.random.default_rng(7)
 
 
@@ -78,7 +97,7 @@ def normalize(sig, peak=0.9):
 
 def write_wav(name, data, peak=0.9):
     data = np.clip(normalize(data, peak), -1, 1)
-    path = os.path.join(OUT, name + ".wav")
+    path = os.path.join(out_for(name), name + ".wav")
     with wave.open(path, "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
@@ -318,7 +337,7 @@ def make_music():
     mix = mix[:total]
     mix[: len(tail)] += tail
     wav = write_wav("music_tmp", mix, 0.8)
-    ogg = os.path.join(OUT, "music.ogg")
+    ogg = os.path.join(out_for("music"), "music.ogg")
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", wav, "-c:a", "libvorbis", "-q:a", "3", ogg], check=True)
     os.remove(wav)
 
@@ -500,13 +519,15 @@ def make_rage():
 
 
 if __name__ == "__main__":
-    os.makedirs(OUT, exist_ok=True)
+    for d in DIRS:
+        os.makedirs(d, exist_ok=True)
     make_sfx()
     make_music()
     make_office()
     make_look_busy()
     make_lift()
     make_rage()
-    for f in sorted(os.listdir(OUT)):
-        if not f.endswith(".import"):
-            print(f"{f:20s} {os.path.getsize(os.path.join(OUT, f)) // 1024} KB")
+    for d in DIRS:
+        for f in sorted(os.listdir(d)):
+            if not f.endswith(".import"):
+                print(f"{f:20s} {os.path.getsize(os.path.join(d, f)) // 1024} KB")

@@ -40,9 +40,9 @@ func _fresh(id: String) -> Array:
 	hub.state = LadderState.new(SAVE)
 	hub.state.tokens = 999
 	root.add_child(hub)
-	var cage := preload("res://scenes/ladder/cage3d.gd").new()
+	var cage := preload("res://addons/hh_minigames/_shared/cage3d.gd").new()
 	root.add_child(cage)
-	var m = load("res://scenes/ladder/%s.gd" % id).new()
+	var m = load(HHMinigames.script_for(id)).new()
 	m.hub = hub
 	m.cage = cage
 	root.add_child(m)
