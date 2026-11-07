@@ -88,6 +88,13 @@ jobs:
           fi
           { echo "Sync mini games from look-busy: $subject"; echo; cat ../body.md; } > ../msg.txt
           git commit -q -F ../msg.txt
+          # Same files as the open sync branch already has: nothing to push.
+          if git rev-parse -q --verify "origin/$BRANCH" >/dev/null \
+            && [ "$(git rev-parse 'HEAD^{tree}')" = "$(git rev-parse "origin/$BRANCH^{tree}")" ]; then
+            echo "::notice title=Mini game sync::The sync PR already has these mini games."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           git push -f origin "$BRANCH"
           echo "changed=true" >> "$GITHUB_OUTPUT"
           echo "subject=$subject" >> "$GITHUB_OUTPUT"
