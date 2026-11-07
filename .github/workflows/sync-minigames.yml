@@ -1,0 +1,110 @@
+# The mini games (addons/hh_minigames) are edited here, in look-busy. Every
+# push to main that changes them copies the folder into killin-in-comedy on the
+# branch sync/minigames and opens (or updates) a pull request there, with the
+# commit messages that changed them.
+#
+# Needs the MINIGAMES_SYNC_TOKEN secret: a fine-grained token with Contents and
+# Pull requests read/write on humble-house-studios/killin-in-comedy.
+name: Sync mini games to killin-in-comedy
+
+on:
+  push:
+    branches: [main]
+    paths: ["addons/hh_minigames/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: sync-minigames
+  cancel-in-progress: false
+
+env:
+  TARGET: humble-house-studios/killin-in-comedy
+  BRANCH: sync/minigames
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the token
+        env:
+          TOKEN: ${{ secrets.MINIGAMES_SYNC_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error title=Mini game sync::Add the MINIGAMES_SYNC_TOKEN secret (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          path: look-busy
+          fetch-depth: 0
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TARGET }}
+          token: ${{ secrets.MINIGAMES_SYNC_TOKEN }}
+          path: comedy
+          fetch-depth: 0
+
+      - name: Copy the mini games onto sync/minigames
+        id: copy
+        shell: bash
+        run: |
+          set -euo pipefail
+          head=$(git -C look-busy rev-parse HEAD)
+          # Where the last sync that reached killin-in-comedy's main came from.
+          last=$(cat comedy/addons/hh_minigames/.synced_from 2>/dev/null || true)
+          if [ -n "$last" ] && git -C look-busy cat-file -e "$last^{commit}" 2>/dev/null; then
+            range="$last..$head"
+          else
+            range="$head~1..$head"
+          fi
+          {
+            echo "Copied from humble-house-studios/look-busy@${head:0:7} (the source of truth for mini games)."
+            echo
+            echo "### look-busy commits"
+            echo
+            git -C look-busy log --reverse --format='#### %h %s%n%n%b' "$range" -- addons/hh_minigames
+            echo
+            echo "_Edit mini games in look-busy; this PR is made by .github/workflows/sync-minigames.yml there._"
+          } > body.md
+          subject=$(git -C look-busy log -1 --format=%s "$head" -- addons/hh_minigames)
+
+          cd comedy
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Rebuilt from main every time, so the PR is always main + the
+          # current mini games and never conflicts.
+          git checkout -B "$BRANCH" origin/main
+          rm -rf addons/hh_minigames
+          mkdir -p addons
+          cp -r ../look-busy/addons/hh_minigames addons/hh_minigames
+          echo "$head" > addons/hh_minigames/.synced_from
+          git add -A addons/hh_minigames
+          if git diff --cached --quiet; then
+            echo "::notice title=Mini game sync::killin-in-comedy already has these mini games."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          { echo "Sync mini games from look-busy: $subject"; echo; cat ../body.md; } > ../msg.txt
+          git commit -q -F ../msg.txt
+          git push -f origin "$BRANCH"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "subject=$subject" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the pull request
+        if: steps.copy.outputs.changed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.MINIGAMES_SYNC_TOKEN }}
+          SUBJECT: ${{ steps.copy.outputs.subject }}
+        run: |
+          set -euo pipefail
+          title="Sync mini games from look-busy: $SUBJECT"
+          pr=$(gh pr list --repo "$TARGET" --head "$BRANCH" --state open --json number -q '.[0].number')
+          if [ -n "$pr" ]; then
+            gh pr edit "$pr" --repo "$TARGET" --title "$title" --body-file body.md
+            echo "::notice title=Mini game sync::Updated $TARGET#$pr"
+          else
+            gh pr create --repo "$TARGET" --base main --head "$BRANCH" --title "$title" --body-file body.md
+          fi

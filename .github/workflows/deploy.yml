@@ -1,5 +1,6 @@
-# Every push to main: Godot exports a web build in the cloud and publishes it
-# to GitHub Pages, so the newest version is always one tap away on your phone.
+# Every push to main: Godot exports Look Busy (the 3D office) for the web and
+# publishes it to GitHub Pages (humble-house-studios.github.io/look-busy/),
+# so the newest version is always one tap away on your phone.
 name: Build and deploy to phone
 
 on:
@@ -167,7 +168,6 @@ jobs:
         shell: bash
         run: |
           if [ -d audio/best ]; then
-            n=$(ls audio/best | wc -l)
             mkdir -p audio/dale && cp -f audio/best/*.mp3 audio/dale/ 2>/dev/null; rm -rf audio/best
             echo "::notice title=Office voice lines::$(ls audio/dale | wc -l) lines recorded"
           fi
@@ -180,8 +180,8 @@ jobs:
       - name: Import project
         run: godot --headless --import || true
 
-      # Engine tests (GUT). A failing test stops the build, so a broken
-      # engine never reaches the play link.
+      # Engine tests (GUT), the office's and every mini game's. A failing test
+      # stops the build, so a broken game never reaches the play link.
       - name: Run engine tests
         shell: bash
         run: |
@@ -193,26 +193,17 @@ jobs:
           done
           exit $code
 
-      - name: Export web build
+      # The office's other computers run other games from their own repos
+      # (Phone Pong, Proof Hand, Cube Desk, the Loot Machine), with their
+      # autoloads. Not committed; fetched fresh every build.
+      - name: Fetch the other desk games
         shell: bash
         run: |
-          mkdir -v -p build/web
-          set +e
-          godot --headless --export-release "Web" build/web/index.html 2>&1 | tee export.log
-          code=${PIPESTATUS[0]}
-          # Surface Godot's errors as annotations so they show up without opening the raw log.
-          { grep -iE "error|failed|cannot|invalid" export.log || true; } | head -20 | while IFS= read -r line; do
-            echo "::warning title=Godot export::${line}"
-          done
-          echo "::notice title=Build output::exit=${code}; files: $(ls build/web 2>&1 | tr '\n' ' ')"
-          if [ ! -f build/web/index.html ]; then
-            tail -15 export.log | while IFS= read -r line; do echo "::error title=Godot log tail::${line}"; done
-            exit 1
-          fi
+          command -v git >/dev/null || (apt-get update -qq && apt-get install -y -qq git)
+          tools/fetch_games.sh --autoloads
+          godot --headless --import >/dev/null 2>&1 || true
 
-      # Second build: the 3D office where you play the game on a computer
-      # monitor, published at /office/. Same project, different main scene.
-      - name: Export office build
+      - name: Export web build
         shell: bash
         env:
           VOICE_URL: ${{ needs.voice.outputs.url }}
@@ -222,20 +213,22 @@ jobs:
             sed -i "s#^const URL := \"\"#const URL := \"$VOICE_URL\"#" data/voice_server.gd
             grep -n "const URL" data/voice_server.gd
           fi
-          # The office's other computers run other games (Phone Pong, Proof
-          # Hand) and need their autoloads; fetch them only for this build so
-          # the main game stays small.
-          command -v git >/dev/null || (apt-get update -qq && apt-get install -y -qq git)
-          tools/fetch_games.sh --autoloads
-          godot --headless --import >/dev/null 2>&1 || true
-          sed -i 's#run/main_scene="res://addons/hh_minigames/standup/main.tscn"#run/main_scene="res://scenes/office/office.tscn"#' project.godot
-          mkdir -v -p build/web/office
-          godot --headless --export-release "Web" build/web/office/index.html 2>&1 | tail -5
-          git checkout project.godot 2>/dev/null || sed -i 's#run/main_scene="res://scenes/office/office.tscn"#run/main_scene="res://addons/hh_minigames/standup/main.tscn"#' project.godot
-          if [ ! -f build/web/office/index.html ]; then
-            echo "::error title=Office export::no build/web/office/index.html"
+          mkdir -v -p build/web
+          set +e
+          godot --headless --export-release "Web" build/web/index.html 2>&1 | tee export.log
+          code=${PIPESTATUS[0]}
+          # Surface Godot's errors as annotations so they show up without opening the raw log.
+          { grep -iE "error|failed|cannot|invalid" export.log | grep -v 'Parameter "m" is null' || true; } | head -20 | while IFS= read -r line; do
+            echo "::warning title=Godot export::${line}"
+          done
+          echo "::notice title=Build output::exit=${code}; files: $(ls build/web 2>&1 | tr '\n' ' ')"
+          if [ ! -f build/web/index.html ]; then
+            tail -15 export.log | while IFS= read -r line; do echo "::error title=Godot log tail::${line}"; done
             exit 1
           fi
+          # Old bookmarks of .../office/ land on the office too.
+          mkdir -p build/web/office
+          printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=../">' > build/web/office/index.html
 
       - name: Add sound test page
         run: cp tools/beep.html build/web/beep.html
