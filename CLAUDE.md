@@ -9,7 +9,7 @@ cages, a trading floor), while Dale guides you and the boss watches. Godot
 Samuel builds from his phone: Claude writes and pushes the code, GitHub builds a
 web version, and he playtests it in Safari. Keep replies short and in plain words,
 and handle git, builds and fixes yourself.
-**End every reply with the play link:** https://humble-house-studios.github.io/look-busy/
+**End every reply with the play link:** https://humble-house-studios.github.io/Look-busy/
 
 ## The scaling rule
 The web build in Safari is the test for every platform. If it looks and plays
@@ -38,7 +38,7 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
 
 ## Testing pipeline
 - After each change: push to `main`, wait for the build to pass (fix it if it
-  doesn't), then send Samuel https://humble-house-studios.github.io/look-busy/
+  doesn't), then send Samuel https://humble-house-studios.github.io/Look-busy/
   with one line on what changed and what to playtest.
 - If GitHub Pages isn't on yet, tell him: repo → **Settings → Pages → Source:
   GitHub Actions.**
@@ -168,7 +168,7 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   voice only allows a handful a day). No Piper. Only the daily
   scheduled run and manual runs record; pushes reuse the cache. Add lines
   freely: the next daily run records them. Published at
-  https://humble-house-studios.github.io/look-busy/ (`deploy.yml`). Screenshots: `tools/office_shot.gd`. `main.gd` must not touch
+  https://humble-house-studios.github.io/Look-busy/ (`deploy.yml`). Screenshots: `tools/office_shot.gd`. `main.gd` must not touch
   the window when it isn't the root (`_owns_window()`).
 - Office design direction lives in docs/look-busy.md; read it before any office change.
 - **Look Busy** (`scenes/office/look_busy.gd`, on/off as LOOK BUSY in the pause

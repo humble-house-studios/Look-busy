@@ -60,7 +60,7 @@ jobs:
             range="$head~1..$head"
           fi
           {
-            echo "Copied from humble-house-studios/look-busy@${head:0:7} (the source of truth for mini games)."
+            echo "Copied from humble-house-studios/Look-busy@${head:0:7} (the source of truth for mini games)."
             echo
             echo "### look-busy commits"
             echo

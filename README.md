@@ -4,7 +4,7 @@ A PS1-style 3D office where every desk runs a real game. You just joined
 Humble House Games: walk the floors, sit down at a computer, play, and don't
 get caught by the boss. Built in Godot 4.3.
 
-**Play the latest build:** https://humble-house-studios.github.io/look-busy/
+**Play the latest build:** https://humble-house-studios.github.io/Look-busy/
 
 Hold your phone upright for the mobile layout; turn it sideways for the Steam
 layout. Keyboard + mouse, touch and an Xbox controller all work. Every push to

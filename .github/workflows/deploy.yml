@@ -1,5 +1,5 @@
 # Every push to main: Godot exports Look Busy (the 3D office) for the web and
-# publishes it to GitHub Pages (humble-house-studios.github.io/look-busy/),
+# publishes it to GitHub Pages (humble-house-studios.github.io/Look-busy/),
 # so the newest version is always one tap away on your phone.
 name: Build and deploy to phone
 
