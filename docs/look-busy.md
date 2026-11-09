@@ -268,3 +268,20 @@ colour, the paper label has its kind and its name in ink.
 | **Star cards share the binder.** A STAR CARDS tab shows every desk's stars as a card, coloured by tier (bronze, silver, gold). | Stars are permanent mastery, pieces are this week's tools. Keeping both in one binder gives one place to see everything you've done. |
 
 Design samples: the "Look Busy — Award Cards" canvas.
+
+## Fun pass 2 (2026-11-09)
+
+A bot played whole weeks (a perfect player, one with a 2 s reaction, one
+camping the arcade) and a new player's first minute. Four problems:
+
+| Problem | Change | Why |
+|---|---|---|
+| Hiding cost you the game: ALT-TAB covered the screen but Pong's ball and the comedy set's clock kept running, so every boss visit lost you a heart or a set. | **The game freezes under the spreadsheet** (its music too, so the office jazz comes back). | A real 90s boss key paused the game. Hiding should cost slack time (the meter you're filling), not your run; otherwise the boss just punishes playing. |
+| Day 1: reading Dale's intro while Marge walked past pushed suspicion to 86/100, for doing exactly what the to-do said. | **Talking to someone holds suspicion** (it looks like a meeting). | Never punish the tutorial. |
+| Once the elevator opened, you could sit in the arcade all day: each missed desk check (+35) faded before the next. Zero risk, max slack. | **Suspicion doesn't cool while you're off the floor.** Three missed checks in a row = a strike; the toast and the HR notice say to be back downstairs when the countdown runs out. | Turns the ladder into a planning game against the countdown (ride up between visits, back down for the desk check) instead of a hiding spot. |
+| With the game frozen, hiding through the whole visit is safe, so there was nothing to gain by waiting. | **Close call doubled: +0:20.** | The risky play (stay on your game until the boss is within 4 m, taking some suspicion) now pays enough to tempt you. |
+
+Also: the comedy desk (the flagship) ran 1280x720 even on an upright phone,
+a small wide box with tiny text. Its window now goes tall like Pong's and
+the game plays its portrait layout. Fall Guy paid ~32 tickets a token to new
+players (aim 10-15): now 1 ticket per 80 points.

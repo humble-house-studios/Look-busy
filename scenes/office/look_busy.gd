@@ -286,7 +286,11 @@ func tick(delta: float) -> void:
 				return
 	_tick_visit(delta)
 	_tick_call(delta)
-	var level := wd.watch(delta, _activity(), _seen, _visit_t >= 0.0 or _connected)
+	# Off the floor (up the elevator), missed desk checks don't fade: come
+	# back down and be seen at your desk to cool off. After hours nobody's
+	# checking, so it fades anywhere.
+	var cools := _in_office() or wd.after_hours()
+	var level := wd.watch(delta, _activity(), _seen, _visit_t >= 0.0 or _connected, 1.0, cools)
 	if level != "":
 		_caught(level)
 	if wd.slack(delta, _activity(), _seen):
@@ -499,7 +503,8 @@ func _empty_desk() -> void:
 		office._toast_time = 4.5
 		return
 	var lines: Array = b.desk
-	office._toast.text = "%s: \"%s\"\n+SUSPICION (EMPTY DESK)" % [b.name, lines[randi() % lines.size()]]
+	office._toast.text = "%s: \"%s\"\n+SUSPICION (EMPTY DESK)%s" % [b.name, lines[randi() % lines.size()],
+			"" if _in_office() else "\nIT WON'T COOL OFF TILL YOU'RE BACK DOWNSTAIRS."]
 	office._toast_time = 4.0
 	_flash = 1.0
 	var level := wd.add(Workday.EMPTY_DESK)
@@ -716,7 +721,9 @@ func _caught(level: String) -> void:
 		return
 	var head := "VERBAL WARNING" if level == "warning" else "WRITTEN UP"
 	var next := "Next time it's a write-up." if level == "warning" else "One more and you're fired."
-	notice.show_notice("HR.EXE", "%s (%d/3)" % [head, wd.strikes], "%s\n\n%s Alt-tab (Tab / Y / the ALT-TAB button) when the boss is near." % [quote, next],
+	var tip := "Alt-tab (Tab / Y / the ALT-TAB button) when the boss is near." if _in_office() or b.kind == "call" \
+			else "Be back downstairs when the countdown runs out: the boss checks your desk."
+	notice.show_notice("HR.EXE", "%s (%d/3)" % [head, wd.strikes], "%s\n\n%s %s" % [quote, next, tip],
 			[["BACK TO WORK", func(): pass]], Color(0.75, 0.35, 0.0) if level == "warning" else Color(0.7, 0.1, 0.08))
 
 

@@ -46,7 +46,7 @@ const QUOTA := [120.0, 150.0, 180.0]
 const MORNING_COFFEE := 15.0
 ## Alt-tab with the boss this close (or a call ringing) and you weren't
 ## caught: a close call, worth slack minutes. Once per visit.
-const CLOSE_CALL := 10.0
+const CLOSE_CALL := 20.0
 const CLOSE_RANGE := 4.0
 ## After hours: game minutes past 5 PM (to 7 PM), slack multiplier, and the
 ## suspicion you start the next morning with per minute stayed (capped).
@@ -162,7 +162,9 @@ func tick(delta: float) -> Array:
 ## (alt-tabbed to the spreadsheet), "chatting", "idle". seen: the boss can see
 ## you. here: the boss is on the floor (or on a call). Returns the strike it
 ## caused ("warning" / "writeup" / "fired") or "".
-func watch(delta: float, activity: String, seen: bool, here: bool, rate_scale := 1.0) -> String:
+## cools: false while you're off the floor (up the elevator), so suspicion
+## from missed desk checks waits for you instead of fading.
+func watch(delta: float, activity: String, seen: bool, here: bool, rate_scale := 1.0, cools := true) -> String:
 	if fired:
 		return ""
 	if seen:
@@ -172,7 +174,7 @@ func watch(delta: float, activity: String, seen: bool, here: bool, rate_scale :=
 			if _grace > 0.0:
 				rate = 0.0
 		suspicion += rate * delta
-	else:
+	elif cools:
 		suspicion -= (DECAY_UNSEEN if here else DECAY_AWAY) * delta
 	suspicion = clampf(suspicion, 0.0, MAX_SUSPICION)
 	if suspicion >= MAX_SUSPICION:

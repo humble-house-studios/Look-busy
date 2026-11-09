@@ -68,6 +68,11 @@ const SCREEN_W := 0.66
 const SCREEN_H := 0.37125
 const SCREEN_POS := Vector3(0.0, 1.17, -2.38)
 const GAME_SIZE := Vector2i(1280, 720)
+## Phone held upright: the comedy game's window goes tall (its portrait
+## layout, the one it was built for on phones) so its cards and text fill the
+## phone when you sit down, like Pong's. Same size in both looks.
+const GAME_SIZE_TALL := Vector2i(720, 1280)
+const MAIN_TALL := Vector2(0.236, 0.42)
 ## Pong monitor: a tall screen on the side desk by the left wall.
 const PONG_SCENE := "res://games/pong/main.tscn"
 const PONG_SIZE := Vector2i(720, 1280)
@@ -297,6 +302,9 @@ var _pong_pc: Computer
 var _proof_view: Window
 ## Pong's desktop window, tall and wide; one shows at a time (phone upright / sideways).
 var _pong_frames: Array[Node3D] = []
+## The main desk (comedy) and its two window frames on the CRT: [wide, tall].
+var _main_pc: Computer
+var _main_frames: Array[Node3D] = []
 ## A/B looks: the nodes that belong to each look, and each screen's spot in
 ## each look ([screen, spot in A, spot in B]).
 var _look_i := 0
@@ -1038,7 +1046,9 @@ func _build_desk() -> void:
 	var a := _style(_world_vp, 0)
 	_crt(a, SCREEN_POS, MAIN_GLASS, beige, "SONIX 17", Color(0.2, 1.0, 0.3))
 	_desktop(a, SCREEN_POS, MAIN_GLASS, Color(0.0, 0.5, 0.5))
-	_window_frame(a, SCREEN_POS, Vector2(SCREEN_W, SCREEN_H), "KILLIN.EXE")
+	_main_frames = [_window_frame(a, SCREEN_POS, Vector2(SCREEN_W, SCREEN_H), "KILLIN.EXE"),
+			_window_frame(a, SCREEN_POS, MAIN_TALL, "KILLIN.EXE")]
+	_main_frames[1].visible = false
 	_main_notes(a, SCREEN_POS, MAIN_GLASS.x * 0.5 + 0.03)
 	# Look B: a charcoal CRT TV, the game straight on the glass.
 	var b := _style(_world_vp, 1)
@@ -1050,7 +1060,7 @@ func _build_desk() -> void:
 	screen.position = SCREEN_POS
 	_world_vp.add_child(screen)
 	_screen_spots.append([screen, SCREEN_POS, tv_pos])
-	_add_computer(screen, Vector2(SCREEN_W, SCREEN_H), _game_vp, GAME_SIZE)
+	_main_pc = _add_computer(screen, Vector2(SCREEN_W, SCREEN_H), _game_vp, GAME_SIZE)
 	_goal_screens["comedy"] = [screen, SCREEN_H]
 
 	# Keyboard, mouse, mug.
@@ -2638,6 +2648,7 @@ func _on_resized() -> void:
 	for cam in [_camera, _screen_camera]:
 		cam.keep_aspect = Camera3D.KEEP_HEIGHT if landscape else Camera3D.KEEP_WIDTH
 	_turn_pong(landscape)
+	_turn_main(landscape)
 	_inset = SafeArea.get_insets(get_viewport().get_visible_rect().size)
 	_apply_insets(true)
 
@@ -2669,6 +2680,26 @@ func _apply_insets(force := false) -> void:
 	_todo.offset_top = 24 + _inset.y
 	_todo.offset_left = 24 + _inset.x
 	_todo.offset_right = 24 + _inset.x + 260
+
+
+## Swap the comedy window (on the main CRT) between wide and tall to match
+## the phone; the game re-lays itself out when its viewport changes shape.
+func _turn_main(wide: bool) -> void:
+	if _main_pc == null:
+		return
+	var px := GAME_SIZE if wide else GAME_SIZE_TALL
+	if _game_vp.size == px:
+		return
+	_main_pc.release()
+	_main_pc.pointer = null
+	_game_vp.size = px
+	_main_pc.pixels = Vector2(px)
+	_main_pc.size = Vector2(SCREEN_W, SCREEN_H) if wide else MAIN_TALL
+	_main_pc.quad.size = _main_pc.size
+	_main_frames[0].visible = wide
+	_main_frames[1].visible = not wide
+	if _goal_screens.has("comedy"):
+		_goal_screens["comedy"][1] = _main_pc.size.y
 
 
 ## Swap Pong's window (on its CRT) between tall and wide to match the phone.

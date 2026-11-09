@@ -553,8 +553,8 @@ class BusyDemo:
 			if top != null:
 				var f := fmod(lt, 1.2) / 1.2
 				var p: Vector2 = top - Vector2(30, f * 34)
-				draw_string_outline(FONT, p, "+0:10", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, 5, Color(0, 0, 0, 1.0 - f))
-				draw_string(FONT, p, "+0:10", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.4, 1.0, 0.45, 1.0 - f))
+				draw_string_outline(FONT, p, "+" + Workday.hours_text(Workday.CLOSE_CALL), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, 5, Color(0, 0, 0, 1.0 - f))
+				draw_string(FONT, p, "+" + Workday.hours_text(Workday.CLOSE_CALL), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.4, 1.0, 0.45, 1.0 - f))
 		_key(lt, caught, Vector2(W - 150, 236))
 
 	## The key you press: ALT-TAB.
@@ -738,8 +738,8 @@ class BusyDemo:
 		var f := fmod(lt, 1.2) / 1.2
 		if lt < 5.5 or lt > 10.6:
 			var p := r.position + Vector2(r.size.x * 0.5, -6 - f * 34)
-			draw_string_outline(FONT, p - Vector2(30, 0), "+0:10", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, 5, Color(0, 0, 0, 1.0 - f))
-			draw_string(FONT, p - Vector2(30, 0), "+0:10", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.4, 1.0, 0.45, 1.0 - f))
+			draw_string_outline(FONT, p - Vector2(30, 0), "+" + Workday.hours_text(Workday.CLOSE_CALL), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, 5, Color(0, 0, 0, 1.0 - f))
+			draw_string(FONT, p - Vector2(30, 0), "+" + Workday.hours_text(Workday.CLOSE_CALL), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.4, 1.0, 0.45, 1.0 - f))
 
 	func _sheet(r: Rect2) -> void:
 		_sheet_on(self, r)

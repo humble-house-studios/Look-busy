@@ -298,3 +298,13 @@ func test_after_hours_survives_a_reload() -> void:
 	assert_true(w2.overtime)
 	assert_almost_eq(w2.minutes, Workday.DAY_MINUTES + 30.0, 0.01)
 	assert_almost_eq(w2.overtime_slack, w.overtime_slack, 0.01)
+
+
+func test_suspicion_waits_while_you_are_off_the_floor() -> void:
+	var w := Workday.new("user://test_workday_away.cfg")
+	w.add(Workday.EMPTY_DESK)
+	w.watch(10.0, "slacking", false, false, 1.0, false)
+	assert_eq(w.suspicion, Workday.EMPTY_DESK, "upstairs, a missed desk check doesn't fade")
+	w.watch(1.0, "idle", false, false)
+	assert_lt(w.suspicion, Workday.EMPTY_DESK, "back on the floor it cools")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://test_workday_away.cfg"))

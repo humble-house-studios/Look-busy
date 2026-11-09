@@ -80,7 +80,7 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
 - **The office** (`scenes/office/`, the main scene): a PS1-style 3D office (wobbly, dithered,
   hand-made boxes) lit at golden hour (low sun through the blinds, warm
   shadows; lights in `ps1.gdshader`), where you walk up and play the real
-  games on the desk monitors, first person (the main desk runs the stand-up game, `addons/hh_minigames/standup/`). Every computer is a chunky beige 90s
+  games on the desk monitors, first person (the main desk runs the stand-up game, `addons/hh_minigames/standup/`; like Pong, its window on the CRT goes tall when the phone is upright so the game plays its portrait layout: `_turn_main()`). Every computer is a chunky beige 90s
   CRT (4:3); each game runs in a 90s desktop window on it (wallpaper, title bar,
   taskbar), built by `_crt()`, `_desktop()` and `_window_frame()` in office.gd.
   A/B test: SCREENS in the pause menu (or L) flips to look B, slim charcoal
@@ -178,7 +178,9 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   the CEO walks silent) on a fixed schedule, a suspicion meter, strikes
   (warning, write-up, fired = run over). Seated, ALT-TAB (Tab / pad Y / the
   button) covers that screen with `scenes/office/spreadsheet.gd` (a
-  `Computer.cover`). Pop-ups: `scenes/office/busy_notice.gd`. Title screen:
+  `Computer.cover`) and freezes the game under it (`_freeze()`). Talking to
+  someone holds suspicion; off the floor (up the elevator) it doesn't cool,
+  so missed desk checks add up. Pop-ups: `scenes/office/busy_notice.gd`. Title screen:
   `scenes/office/busy_title.gd` (once per launch: a looping cartoon filmed live in the 3D office (stand-in you + Marge) of the
   loop and three rules, nothing past floor 1 named). Slack meter: playing a
   game unseen fills the day's quota (`Workday.QUOTA`, starts with a coffee
