@@ -54,7 +54,7 @@ const BOSSES := [
 		"habit": "CHAD WORKS FROM HOME. HE VIDEO-CALLS YOUR SCREEN AT :45 EVERY HOUR. BE AT A DESK, LOOKING BUSY.",
 		"at": 45, "every": 60, "ring": 4.0, "call": 5.0, "rate": 45.0,
 		"hello": "CHAD. VP. WORKING FROM HOME (HIS BOAT).",
-		"warning": ["Bro. Is that Pong behind your spreadsheet? Warning, bro.", "Quick sync: stop gaming. That's a warning."],
+		"warning": ["Bro. Is that a game behind your spreadsheet? Warning, bro.", "Quick sync: stop gaming. That's a warning."],
 		"writeup": ["Circling back: you're written up. Per my last email.", "Not a great look, champ. That's a write-up."],
 		"fired": ["We're going to have to let you go. My boat's breaking up.", "Synergy says: you're fired. Peace."],
 		"desk": ["You're on mute. And also not at your desk.", "Hello? Is anyone at this desk?"],
