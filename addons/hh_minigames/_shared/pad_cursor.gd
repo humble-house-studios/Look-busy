@@ -110,7 +110,7 @@ static func _badge_text(ci: CanvasItem, font: Font, at: Vector2, text: String, s
 ## Draw a controls card: a dark panel of [badge, text] rows, top centre of
 ## `view`, scaled by `k` (1.0 at a 720-wide screen). Used here and by the office.
 static func draw_card(ci: CanvasItem, view: Vector2, rows: Array, k: float, alpha: float, top := 0.0) -> void:
-	if rows.is_empty() or alpha <= 0.0:
+	if rows.is_empty() or alpha <= 0.0 or k < 0.1:
 		return
 	var font := ThemeDB.fallback_font
 	var fs := int(22 * k)
@@ -429,6 +429,10 @@ func _blocked(b: BaseButton, controls: Array) -> bool:
 func _draw_ring() -> void:
 	var view := get_viewport().get_visible_rect().size
 	var k := minf(view.x, view.y) / 720.0
+	# A screen shrunk off-floor (a few pixels wide): nothing readable to draw,
+	# and fonts at size 0 error every frame.
+	if k < 0.1:
+		return
 	if _card_time > 0.0:
 		draw_card(_ring, view, _card, k, clampf(_card_time, 0.0, 1.0))
 	if not active:

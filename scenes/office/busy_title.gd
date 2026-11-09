@@ -18,7 +18,7 @@ const INK := Color(0.08, 0.08, 0.1)
 ## The three rules, with the colour of the HUD bar each one maps to.
 const RULES := [
 	[Color(0.3, 0.85, 0.35), "PLAY GAMES AT WORK", "Every minute fills your SLACK meter. Hit the day's quota."],
-	[Color(0.95, 0.25, 0.2), "DON'T GET CAUGHT", "Boss near? ALT-TAB to a spreadsheet. Seen playing = suspicion. 3 strikes = fired."],
+	[Color(0.95, 0.25, 0.2), "DON'T GET CAUGHT", "Boss near? ALT-TAB to a spreadsheet (your game waits). Seen playing = suspicion. 3 strikes = fired."],
 	[Color(1.0, 0.45, 0.8), "SHIP YOUR GAME FRIDAY", "Beat desk games for pieces. Good reviews = promoted a floor."],
 ]
 

@@ -42,7 +42,7 @@ const PUSHER_ZONE_RECHARGE := 9.0
 ## and the score that beats it. Style (flips) counts double with Bernie's
 ## perk. A round is RAGDOLL_KICKS bounces; points per metre of the best
 ## height, per bumper hit and per ring of the bell at the top.
-const RAGDOLL_POINTS_PER_TICKET := 50
+const RAGDOLL_POINTS_PER_TICKET := 80
 const RAGDOLL_BEAT := 1500
 const RAGDOLL_STYLE_X := 2.0
 const RAGDOLL_KICKS := 8

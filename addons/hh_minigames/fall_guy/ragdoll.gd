@@ -7,7 +7,7 @@ extends "res://addons/hh_minigames/_shared/machine.gd"
 ## kick). Hold < or > in the air to drift and cartwheel him into the
 ## bumpers on the glass. Points for the best height, each bumper, each full
 ## flip (double with Bernie's style perk), hard knocks off the glass, and
-## ringing the bell at the top. Tickets = points / 50; 1500 beats the machine.
+## ringing the bell at the top. Tickets = points / 80; 1500 beats the machine.
 ## A round is ArcadeRules.RAGDOLL_KICKS bounces. PERFECT bounces back to
 ## back chain a multiplier (x1.25 up to x2.5) on everything he hits; one bumper
 ## is lit as the TARGET (triple points, then another lights); the bell gives

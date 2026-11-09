@@ -32,15 +32,18 @@ func test_nothing_reaches_outside_the_addon() -> void:
 		if not p.begins_with(ROOT) and not p.begins_with("res://addons/gut/"):
 			outside.append(c["class"])
 	var paths := RegEx.create_from_string("res://[A-Za-z0-9_./%-]+")
+	# Class names count in code, not inside text ("Deck: %d cards").
+	var strings := RegEx.create_from_string("\"(?:[^\"\\\\]|\\\\.)*\"")
 	for file in _scripts(ROOT):
 		var text := FileAccess.get_file_as_string(file)
 		var code := _strip_comments(text)
 		for m in paths.search_all(code):
 			var p := m.get_string()
 			assert_true(p.begins_with(ROOT) or p.begins_with("res://addons/gut/"), "%s names %s" % [file, p])
+		var bare := strings.sub(code, "\"\"", true)
 		for name in outside:
 			var word := RegEx.create_from_string("\\b%s\\b" % name)
-			assert_null(word.search(code), "%s uses %s (not part of the addon)" % [file, name])
+			assert_null(word.search(bare), "%s uses %s (not part of the addon)" % [file, name])
 
 
 func _strip_comments(text: String) -> String:

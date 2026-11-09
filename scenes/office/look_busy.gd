@@ -71,6 +71,8 @@ var disks: Control
 var _sheet_vp: SubViewport
 var _sheet: Control
 var _covered = null
+## [node, process_mode] of the game frozen under the spreadsheet.
+var _frozen: Array = []
 var _hud: Control
 var _alt_button: Button
 var _bosses := {}
@@ -907,6 +909,7 @@ func alt_tab() -> void:
 	_sheet.open(wd.cells_today)
 	pc.set_cover(_sheet_vp)
 	_covered = pc
+	_freeze(pc, true)
 	_play(preload("res://addons/hh_minigames/_shared/audio/click.wav"), -4.0)
 	if not _close_done and _boss_close() and not wd.in_grace() and wd.suspicion < Workday.MAX_SUSPICION:
 		_close_call()
@@ -914,11 +917,28 @@ func alt_tab() -> void:
 
 func uncover() -> void:
 	if _covered:
+		_freeze(_covered, false)
 		_covered.release()
 		_covered.set_cover(null)
 		_covered = null
 	if _sheet_vp:
 		_sheet_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+
+
+## A real boss key froze the game behind it: the game under the spreadsheet
+## waits (its ball, its set clock, its music), so hiding from the boss costs
+## slack time, not your run. (A glass cage's 3D machine keeps going.)
+func _freeze(pc, on: bool) -> void:
+	if on:
+		_frozen.clear()
+		for n in pc.view.get_children():
+			_frozen.append([n, n.process_mode])
+			n.process_mode = Node.PROCESS_MODE_DISABLED
+		return
+	for e in _frozen:
+		if is_instance_valid(e[0]):
+			e[0].process_mode = e[1]
+	_frozen.clear()
 
 
 ## The office stood you up or moved you to another screen.

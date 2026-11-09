@@ -83,6 +83,7 @@ func _init() -> void:
 	busy.alt_tab()
 	await frames(5)
 	check(busy.is_covered() and main_pc.cover != null, "alt-tab covers the screen")
+	check(main_pc.view.get_child(0).process_mode == Node.PROCESS_MODE_DISABLED, "the game waits under the spreadsheet")
 	var cells_before: int = busy.wd.cells
 	var sheet = busy._sheet
 	var todo: int = sheet._todo[0]
@@ -94,6 +95,7 @@ func _init() -> void:
 	office._set_seat(null)
 	await frames(5)
 	check(not busy.is_covered() and main_pc.cover == null, "standing up uncovers the screen")
+	check(main_pc.view.get_child(0).process_mode != Node.PROCESS_MODE_DISABLED, "and the game runs again")
 	# Let the visit finish.
 	for i in 3000:
 		await process_frame

@@ -22,8 +22,10 @@ const STRIKES := ["warning", "writeup", "fired"]
 ## After a strike the boss can't add more for a moment.
 const GRACE := 6.0
 ## Suspicion per second by what you're doing while the boss watches. Playing a
-## game ("slacking") uses the boss's own rate.
-const RATE := {"chatting": 12.0, "idle": 4.0, "working": -16.0}
+## game ("slacking") uses the boss's own rate. Talking to a coworker looks
+## like a meeting: it holds suspicion where it is (Dale's tutorial talks used
+## to strike you when Marge walked past mid-sentence).
+const RATE := {"chatting": 0.0, "idle": 4.0, "working": -16.0}
 const DECAY_UNSEEN := 3.0
 const DECAY_AWAY := 6.0
 ## The boss stops at your desk and you're nowhere near one.

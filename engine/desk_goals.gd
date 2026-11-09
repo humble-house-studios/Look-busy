@@ -46,7 +46,7 @@ const DESKS := {
 		["best:trading", 10, "SURVIVE WEEK 2"]]},
 	"ragdoll": {"name": "FALL GUY", "tiers": [
 		["best:ragdoll", 1, "SCORE ANY POINTS"],
-		["best:ragdoll", 15, "SCORE 750 IN ONE ROUND"],
+		["best:ragdoll", 750 / ArcadeRules.RAGDOLL_POINTS_PER_TICKET, "SCORE 750 IN ONE ROUND"],
 		["beat:ragdoll", 1, "SCORE 1500 IN ONE ROUND"]]},
 	"rage": {"name": "RAGE CAGE", "tiers": [
 		["best:rage", 1, "KNOCK A PIECE OFF THE TABLE"],
