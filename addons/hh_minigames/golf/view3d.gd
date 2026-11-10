@@ -10,6 +10,7 @@ extends SubViewportContainer
 ## you can't see), so a whole arcade of these stays cheap.
 
 const SHADER := preload("res://addons/hh_minigames/_shared/retro3d.gdshader")
+const Handmade := preload("res://addons/hh_minigames/_shared/handmade.gd")
 const POST := preload("res://addons/hh_minigames/golf/retro_post.gdshader")
 const FONT := preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
 const LIGHTS := 6
@@ -156,42 +157,60 @@ func _place(mi: Node3D, at: Vector3, parent: Node, rot: Vector3) -> void:
 	(parent if parent else root).add_child(mi)
 
 
-## A box, subdivided so the per-vertex light has points to land on.
+## A box, cut into a grid so the per-vertex light has points to land on.
+## Hand-made (bevelled, never quite square: handmade.gd) when it's painted
+## with this world's own shader and thick enough; glass and thin panes stay exact.
 func box(dims: Vector3, at: Vector3, m: Material, parent: Node = null, rot := Vector3.ZERO) -> MeshInstance3D:
-	var mesh := BoxMesh.new()
-	mesh.size = dims
-	mesh.subdivide_width = clampi(int(dims.x / 0.35), 0, 64)
-	mesh.subdivide_height = clampi(int(dims.y / 0.35), 0, 64)
-	mesh.subdivide_depth = clampi(int(dims.z / 0.35), 0, 64)
 	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
+	if _crafted(m) and not Handmade.is_thin(dims) and maxf(dims.x, maxf(dims.y, dims.z)) < 3.3:
+		mi.mesh = Handmade.box(dims, Handmade.variant_at(at + dims), 0.35, 64)
+	else:
+		var mesh := BoxMesh.new()
+		mesh.size = dims
+		mesh.subdivide_width = clampi(int(dims.x / 0.35), 0, 64)
+		mesh.subdivide_height = clampi(int(dims.y / 0.35), 0, 64)
+		mesh.subdivide_depth = clampi(int(dims.z / 0.35), 0, 64)
+		mi.mesh = mesh
 	mi.material_override = m
 	_place(mi, at, parent, rot)
 	return mi
 
 
+## True for materials painted by this world's shader (not glass).
+func _crafted(m: Material) -> bool:
+	return m is ShaderMaterial and (m as ShaderMaterial).shader == SHADER
+
+
+## A ball (handmade.gd, kept round here: it rolls).
 func ball(r: float, at: Vector3, m: Material, parent: Node = null, segs := 8) -> MeshInstance3D:
-	var mesh := SphereMesh.new()
-	mesh.radius = r
-	mesh.height = r * 2.0
-	mesh.radial_segments = segs
-	mesh.rings = maxi(3, segs / 2)
 	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
+	if _crafted(m):
+		mi.mesh = Handmade.blob(Vector3.ONE * r * 2.0, 1.0, segs, 0, 0.0)
+	else:
+		var mesh := SphereMesh.new()
+		mesh.radius = r
+		mesh.height = r * 2.0
+		mesh.radial_segments = segs
+		mesh.rings = maxi(3, segs / 2)
+		mi.mesh = mesh
 	mi.material_override = m
 	_place(mi, at, parent, Vector3.ZERO)
 	return mi
 
 
+## A turned shape along y (handmade.gd): rims bevelled, never quite round.
 func cyl(r_top: float, r_bottom: float, h: float, at: Vector3, m: Material, parent: Node = null, rot := Vector3.ZERO, segs := 10) -> MeshInstance3D:
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = r_top
-	mesh.bottom_radius = r_bottom
-	mesh.height = h
-	mesh.radial_segments = segs
-	mesh.rings = 1
 	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
+	if _crafted(m) and h >= 0.012:
+		mi.mesh = Handmade.tube(r_bottom, h, segs, r_top, Handmade.variant_at(at))
+	else:
+		var mesh := CylinderMesh.new()
+		mesh.top_radius = r_top
+		mesh.bottom_radius = r_bottom
+		mesh.height = h
+		mesh.radial_segments = segs
+		mesh.rings = 1
+		mi.mesh = mesh
 	mi.material_override = m
 	_place(mi, at, parent, rot)
 	return mi

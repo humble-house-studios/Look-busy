@@ -285,3 +285,21 @@ Also: the comedy desk (the flagship) ran 1280x720 even on an upright phone,
 a small wide box with tiny text. Its window now goes tall like Pong's and
 the game plays its portrait layout. Fall Guy paid ~32 tickets a token to new
 players (aim 10-15): now 1 ticket per 80 points.
+
+## Hand-made pass (2026-11-10)
+
+Samuel: make every character, game and room look more hand-made and just
+better. The office was perfect boxes with TV-static textures, and the people
+were boxes with boxes for faces.
+
+| Change | Why |
+|---|---|
+| **Every shape is hand-made** (`handmade.gd`): bevelled edges, corners that are never quite square, tubes that are never quite round, lumps of clay for anything soft. Each piece gets its own paint mix. | A perfect box reads as a placeholder. Something slightly off-square with a worn edge reads as a thing somebody built, which is the whole PS1-diorama charm. |
+| **Painted, not noisy.** The per-texel static is now a blotchy coat with long brush strokes; bevels are dry-brushed lighter on top and darker underneath; everything darkens toward the floor and solid furniture sits on a soft painted shadow. | The static made every wall look like the same material. Paint, worn edges and grounding shadows are what model-makers do to make a miniature look real. |
+| **People are puppets** (`puppet.gd`): a soft block of a head with ears, a nose, blushed cheeks, brows, and eyes with whites; shoulders, hands with thumbs, collars, shoes; hair built up in pieces. Dale gets a short-sleeved pale blue shirt. | You spend the game talking to these people, close up. Boxes with dots can't look bored, smug or stern. Dale's cream shirt was the same colour as his skin in the window light, so he read as one lump. |
+| **The sun doesn't burn out.** A soft shoulder on the brightest light (glows keep their punch). | Dale sits in the window: his face was flat yellow. Golden hour should be warm, not blown. |
+| **Props made properly**: swivel chairs with cushions and casters, mugs with handles, a jug on the water cooler, a leaning plant, taped-up posters, a clock with hour marks, Dale's desk lamp, a coat rack, unpacked moving boxes, traders' chairs and CRTs, the founder's leather chair. | Lived-in clutter is what sells "office", and each one is a chance for a silhouette that isn't a box. |
+| **Kept exact on purpose:** walls, floors, ceilings, elevators, glass, screens. | Crooked walls leave gaps you can see the void through, and a game's screen has to stay a clean rectangle. |
+
+Cost: about a third more triangles and draw calls in the busiest views
+(arcade ~59k triangles), build time +0.3 s on a desktop.

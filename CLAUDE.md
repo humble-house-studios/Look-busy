@@ -68,6 +68,27 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
 - Office logic in `res://engine/`, with no scene dependencies, tested headless
   with GUT (`tests/` and every `addons/hh_minigames/*/tests/`).
 - Placeholder art only: colored panels and labels. No image generation.
+- **Everything is hand-made** (2026-11-10; why: docs/look-busy.md, "Hand-made
+  pass"). Never use Godot's BoxMesh / CylinderMesh / SphereMesh for a model:
+  build from `addons/hh_minigames/_shared/handmade.gd` (`box` = bevelled,
+  corners never quite square, pulled inward only so pieces never poke through
+  each other; `tube` = a turned shape; `blob` = a lump of clay, `roundness`
+  under 1 = a soft pillow), through the office's `_box` / `_cyl` / `_ball` /
+  `_lump` or the cages' `box` / `cyl` / `ball`. Shapes carry vertex colours
+  that `ps1.gdshader` and `retro3d.gdshader` read to paint them (dry-brushed
+  bevels, a blotchy coat, each piece its own mix); plain meshes read as
+  unpainted. Kept exact on purpose: walls, floors and ceilings (`_exact`, or
+  they'd leave gaps), elevators, glass, and anything under 12 mm thick
+  (screens, stickers, glowing panels). Solid furniture gets a painted floor
+  shadow by itself (`_ground` / `_shadow`); ps1.gdshader darkens everything
+  toward the floor. **People** are puppets from `scenes/office/puppet.gd`
+  (Dale, coworkers, bosses, the board, the title screen's you: `look`
+  dictionaries as before, plus `belly`, `sleeves`, `brows`, `collar`);
+  seated ones sink by `Puppet.SIT_DROP` onto `_chair()`. Props to reuse:
+  `_chair`, `_mug`, `_tape` (a poster's four bits of tape). Check a model by
+  eye with `tools/look_shot.gd` (stand anywhere, save a PNG, prints triangle
+  counts); `addons/hh_minigames/_shared/tests/test_handmade.gd` keeps the
+  shapes inside their sizes.
 - **Controllers:** `addons/hh_minigames/_shared/pad_cursor.gd` (a copy lives in Loot, Proof and Cube) puts a
   frame on the buttons: D-pad/stick moves, A presses; buttons can carry meta
   `pad_button` (X = Land It, Start = pause, B = skip). The office walks on the

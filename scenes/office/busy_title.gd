@@ -440,12 +440,7 @@ class BusyDemo:
 		_you = ladder._person("office", "boss_title_you", YOU_AT, PI, YOU_LOOK, true)
 		_you_head = ladder._people["boss_title_you"].head
 		var fabric: Material = office._mat(Color(0.2, 0.22, 0.3))
-		var dark: Material = office._mat(Color(0.1, 0.1, 0.12))
-		office._box(Vector3(0.48, 0.08, 0.46), Vector3(0, 0.48, 0), fabric, false, Vector3.ZERO, _you)
-		office._box(Vector3(0.4, 0.22, 0.06), Vector3(0, 0.66, -0.24), fabric, false, Vector3(0.1, 0, 0), _you)
-		office._box(Vector3(0.06, 0.44, 0.06), Vector3(0, 0.22, 0), dark, false, Vector3.ZERO, _you)
-		office._box(Vector3(0.5, 0.04, 0.06), Vector3(0, 0.03, 0), dark, false, Vector3.ZERO, _you)
-		office._box(Vector3(0.06, 0.04, 0.5), Vector3(0, 0.03, 0), dark, false, Vector3.ZERO, _you)
+		office._chair(_you, fabric)
 		var b: Dictionary = BusyLines.BOSSES[0]
 		_boss3d = ladder._person("office", "boss_title_boss", Vector3(WALK[0].x, 0, WALK[0].y), PI, b.look_body)
 		_you.visible = false
@@ -509,7 +504,7 @@ class BusyDemo:
 		_cam.look_at_from_position(CAM_POS + drift, CAM_AT)
 		# You: bopping along while you play; still and stiff once you alt-tab.
 		var body: Node3D = _you.get_child(0)
-		body.position.y = -0.42 + (absf(sin(lt * 6.0)) * 0.015 if not tabbed else 0.0)
+		body.position.y = -office.Puppet.SIT_DROP + (absf(sin(lt * 6.0)) * 0.015 if not tabbed else 0.0)
 		var bx := _boss_at(lt)
 		var glance := 0.0
 		if not bx.is_empty() and lt >= 4.2 and lt < 5.4:

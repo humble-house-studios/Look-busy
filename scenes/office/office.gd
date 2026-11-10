@@ -287,7 +287,14 @@ class Computer:
 		var lift := (top - bottom) * tan_h * d
 		return Transform3D(b, xf.origin + b.z * d + b.y * lift)
 
+const Handmade := preload("res://addons/hh_minigames/_shared/handmade.gd")
+const Puppet := preload("res://scenes/office/puppet.gd")
 var _ps1 := preload("res://scenes/office/ps1.gdshader")
+## True while walls, floors and ceilings are being built: those boxes stay
+## exact (see _box) so rooms have no gaps.
+var _exact := false
+var _shadow_mat: StandardMaterial3D
+var _shadow_quad: QuadMesh
 var _monitor_shader := preload("res://scenes/office/monitor.gdshader")
 
 var _world_box: SubViewportContainer
@@ -737,16 +744,24 @@ func _mat(albedo: Color, pattern := 0, albedo2 := Color.BLACK, texel := 24.0, em
 	return m
 
 
-## A box mesh at pos (its centre), optionally solid to walk into.
+## A box at pos (its centre), optionally solid to walk into. Hand-made
+## (bevelled, never quite square: Handmade.box) unless it's a wall, floor or
+## ceiling (`_exact`, so they still meet without gaps) or too thin to bevel
+## (screens, stickers, glowing panels).
 func _box(size: Vector3, pos: Vector3, mat: Material, solid := false, rot := Vector3.ZERO, parent: Node = null) -> MeshInstance3D:
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	# Subdivide big faces so the per-vertex light has something to work with.
-	mesh.subdivide_width = clampi(int(size.x / 0.3), 0, 24)
-	mesh.subdivide_height = clampi(int(size.y / 0.3), 0, 24)
-	mesh.subdivide_depth = clampi(int(size.z / 0.3), 0, 24)
 	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
+	var longest := maxf(size.x, maxf(size.y, size.z))
+	var wall := solid and size.y >= 1.85 and minf(size.x, size.z) <= 0.11
+	if _exact or wall or longest >= 3.3 or Handmade.is_thin(size):
+		var mesh := BoxMesh.new()
+		mesh.size = size
+		# Subdivide big faces so the per-vertex light has something to work with.
+		mesh.subdivide_width = clampi(int(size.x / 0.3), 0, 24)
+		mesh.subdivide_height = clampi(int(size.y / 0.3), 0, 24)
+		mesh.subdivide_depth = clampi(int(size.z / 0.3), 0, 24)
+		mi.mesh = mesh
+	else:
+		mi.mesh = Handmade.box(size, Handmade.variant_at(pos + size))
 	mi.material_override = mat
 	mi.layers = LAYER_WORLD
 	mi.position = pos
@@ -760,23 +775,68 @@ func _box(size: Vector3, pos: Vector3, mat: Material, solid := false, rot := Vec
 		shape.shape = box
 		body.add_child(shape)
 		mi.add_child(body)
+		if not (_exact or wall or longest >= 3.3):
+			_ground(mi, size)
 	return mi
 
 
+## A turned shape (mug, leg, bin): Handmade.tube, rims bevelled, never quite round.
 func _cyl(radius: float, height: float, pos: Vector3, mat: Material, rot := Vector3.ZERO, sides := 8, top := -1.0, parent: Node = null) -> MeshInstance3D:
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = radius if top < 0 else top
-	mesh.bottom_radius = radius
-	mesh.height = height
-	mesh.radial_segments = sides
-	mesh.rings = 1
 	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
+	mi.mesh = Handmade.tube(radius, height, sides, top, Handmade.variant_at(pos))
 	mi.material_override = mat
 	mi.layers = LAYER_WORLD
 	mi.position = pos
 	mi.rotation = rot
 	(parent if parent else _world_vp).add_child(mi)
+	return mi
+
+
+## A soft painted shadow on the floor under a solid piece of furniture: dark
+## under things that stand on the carpet, fainter under table tops.
+func _ground(mi: MeshInstance3D, size: Vector3) -> void:
+	if not mi.is_inside_tree():
+		return
+	var at := mi.global_position
+	var bottom := at.y - size.y * 0.5
+	if bottom < -0.02 or bottom > 0.9 or absf(mi.global_transform.basis.y.y) < 0.95:
+		return
+	# Under the piece's own parent, so it hides (and moves) with it.
+	_shadow(Vector3(at.x, 0.0, at.z), Vector2(size.x, size.z), lerpf(0.55, 0.16, bottom / 0.9), mi.global_rotation.y, mi.get_parent())
+
+
+## A blob of shadow painted on the floor at `at` (world), `size` across.
+func _shadow(at: Vector3, size: Vector2, strength := 0.5, yaw := 0.0, parent: Node = null) -> MeshInstance3D:
+	if _shadow_mat == null:
+		var grad := Gradient.new()
+		grad.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
+		grad.colors = PackedColorArray([Color(0.07, 0.05, 0.07, 1.0), Color(0.07, 0.05, 0.07, 0.7), Color(0.07, 0.05, 0.07, 0.0)])
+		var tex := GradientTexture2D.new()
+		tex.gradient = grad
+		tex.width = 32
+		tex.height = 32
+		tex.fill = GradientTexture2D.FILL_RADIAL
+		tex.fill_from = Vector2(0.5, 0.5)
+		tex.fill_to = Vector2(1.0, 0.5)
+		_shadow_mat = StandardMaterial3D.new()
+		_shadow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_shadow_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_shadow_mat.albedo_texture = tex
+		_shadow_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		_shadow_mat.vertex_color_use_as_albedo = true
+		_shadow_quad = QuadMesh.new()
+		_shadow_quad.size = Vector2.ONE
+		_shadow_quad.orientation = PlaneMesh.FACE_Y
+	var mi := MeshInstance3D.new()
+	mi.mesh = _shadow_quad
+	mi.material_override = _shadow_mat
+	mi.layers = LAYER_WORLD
+	mi.transparency = 1.0 - clampf(strength, 0.0, 1.0)
+	mi.scale = Vector3(size.x * 1.3 + 0.1, 1.0, size.y * 1.3 + 0.1)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	(parent if parent else _world_vp).add_child(mi)
+	mi.global_position = Vector3(at.x, at.y + 0.006, at.z)
+	mi.global_rotation = Vector3(0.0, yaw, 0.0)
 	return mi
 
 
@@ -915,6 +975,7 @@ func _build_room() -> void:
 	var carpet := _mat(Color(0.5, 0.6, 0.56), 1, Color(0.43, 0.52, 0.49), 28.0)
 	var ceiling := _mat(Color(0.93, 0.92, 0.87), 2, Color(0.64, 0.62, 0.58), 30.0)
 	var trim := _mat(Color(0.58, 0.4, 0.25))
+	_exact = true
 	_box(Vector3(7.4, 0.1, 7.4), Vector3(0, -0.05, 0.5), carpet, true)
 	_box(Vector3(7.4, 0.1, 7.4), Vector3(0, 2.65, 0.5), ceiling, true)
 	_box(Vector3(7.4, 2.6, 0.1), Vector3(0, 1.3, -3.05), wall, true)
@@ -1066,9 +1127,7 @@ func _build_desk() -> void:
 	# Keyboard, mouse, mug.
 	_box(Vector3(0.46, 0.03, 0.16), Vector3(-0.05, 0.775, -2.2), _mat(Color(0.88, 0.85, 0.74), 7, Color(0.5, 0.48, 0.42)), false, Vector3(0.08, 0, 0))
 	_box(Vector3(0.06, 0.025, 0.1), Vector3(0.32, 0.772, -2.2), beige)
-	var mug := _mat(Color(0.95, 0.45, 0.35))
-	_cyl(0.045, 0.1, Vector3(-0.62, 0.81, -2.35), mug)
-	_cyl(0.038, 0.005, Vector3(-0.62, 0.861, -2.35), _mat(Color(0.35, 0.2, 0.1)))
+	_mug(Vector3(-0.62, 0.76, -2.35), _mat(Color(0.95, 0.45, 0.35)), null, Color(0.33, 0.19, 0.1), 2.4)
 	# Paper stack.
 	_box(Vector3(0.22, 0.04, 0.3), Vector3(0.7, 0.78, -2.5), _mat(Color(0.96, 0.96, 0.92)), false, Vector3(0, 0.2, 0))
 
@@ -1120,7 +1179,7 @@ func _build_pong_desk() -> void:
 	for spot in [[a, CRT_GLASS.x * 0.5 + 0.02, SIDE_CY + 0.2], [_side_b, TV_GLASS.x * 0.5 + 0.01, TV_SIDE_CY + 0.16]]:
 		_box(Vector3(0.08, 0.08, 0.004), Vector3(spot[1], spot[2], SIDE_Z), _mat(Color(0.6, 0.95, 0.65)), false, Vector3(0, 0, -0.15), spot[0])
 		_label("BEAT\nMY\nBEST", Vector3(spot[1], spot[2], SIDE_Z + 0.004), 8, Color(0.1, 0.15, 0.1), Vector3(0, 0, -0.15), 0.0, spot[0])
-	_cyl(0.05, 0.12, Vector3(0.45, 0.82, 0.12), _mat(Color(0.98, 0.85, 0.3)), Vector3.ZERO, 8, -1.0, rig)
+	_mug(Vector3(0.45, 0.76, 0.12), _mat(Color(0.98, 0.85, 0.3)), rig, Color(0.33, 0.19, 0.1), 0.6)
 	_goal_screens["pong"] = [screen, PONG_SCREEN.y]
 	if _pong_view:
 		_pong_frames = [_window_frame(a, screen.position, PONG_SCREEN, "PONG.EXE"),
@@ -1147,7 +1206,7 @@ func _build_proof_desk() -> void:
 	var screen := _side_desk(rig, wood, _beige(), "THE PROVER", Color(0.3, 1.0, 0.4), Color(0.12, 0.5, 0.32), _charcoal())
 	var a := _side_a
 	# Coffee and a stack of scratch paper.
-	_cyl(0.045, 0.1, Vector3(0.46, 0.81, 0.12), _mat(Color(0.96, 0.96, 0.94)), Vector3.ZERO, 8, -1.0, rig)
+	_mug(Vector3(0.46, 0.76, 0.12), _mat(Color(0.96, 0.96, 0.94)), rig, Color(0.33, 0.19, 0.1), -0.5)
 	_box(Vector3(0.22, 0.05, 0.3), Vector3(-0.44, 0.785, 0.12), _mat(Color(0.96, 0.96, 0.9)), false, Vector3(0, -0.25, 0), rig)
 	# Chalkboard on the wall behind.
 	var board_z := -0.33
@@ -1333,15 +1392,9 @@ func _build_props() -> void:
 	# Office chair, pushed aside so you can walk up.
 	var chair := Node3D.new()
 	chair.position = Vector3(1.25, 0, -1.7)
-	chair.rotation.y = -0.7
+	chair.rotation.y = PI - 0.7
 	_world_vp.add_child(chair)
-	var fabric := _mat(Color(0.3, 0.45, 0.66), 1, Color(0.25, 0.38, 0.58), 50.0)
-	_box(Vector3(0.48, 0.08, 0.46), Vector3(0, 0.48, 0), fabric, true, Vector3.ZERO, chair)
-	_box(Vector3(0.46, 0.5, 0.07), Vector3(0, 0.82, 0.22), fabric, false, Vector3(-0.1, 0, 0), chair)
-	_cyl(0.03, 0.4, Vector3(0, 0.25, 0), dark, Vector3.ZERO, 6, -1.0, chair)
-	for i in 5:
-		var a := TAU * i / 5.0
-		_box(Vector3(0.04, 0.03, 0.3), Vector3(sin(a) * 0.14, 0.05, cos(a) * 0.14), dark, false, Vector3(0, a, 0), chair)
+	_chair(chair, _mat(Color(0.3, 0.45, 0.66), 1, Color(0.25, 0.38, 0.58), 50.0), true)
 
 	# Filing cabinet.
 	_box(Vector3(0.5, 1.3, 0.6), Vector3(-3.15, 0.65, -2.6), metal, true)
@@ -1349,28 +1402,72 @@ func _build_props() -> void:
 		_box(Vector3(0.44, 0.015, 0.01), Vector3(-3.15, y + 0.12, -2.29), dark)
 		_box(Vector3(0.12, 0.03, 0.02), Vector3(-3.15, y, -2.29), dark)
 
-	# Plant in the corner.
-	_cyl(0.18, 0.36, Vector3(3.1, 0.18, -2.6), _mat(Color(0.55, 0.3, 0.2)), Vector3.ZERO, 7, 0.22)
-	var leaf := _mat(Color(0.32, 0.64, 0.32), 6, Color.BLACK, 30.0)
-	for i in 7:
-		var a := TAU * i / 7.0
-		_box(Vector3(0.1, 0.55, 0.03), Vector3(3.1 + sin(a) * 0.1, 0.62, -2.6 + cos(a) * 0.1), leaf, false, Vector3(cos(a) * 0.45, a, -sin(a) * 0.45))
+	# Plant in the corner: a terracotta pot, soil, and leaves that all lean
+	# their own way.
+	var pot := _mat(Color(0.62, 0.34, 0.22), 6, Color.BLACK, 40.0)
+	_cyl(0.16, 0.34, Vector3(3.1, 0.17, -2.6), pot, Vector3.ZERO, 8, 0.21)
+	_cyl(0.225, 0.05, Vector3(3.1, 0.345, -2.6), pot, Vector3.ZERO, 8)
+	_cyl(0.19, 0.02, Vector3(3.1, 0.365, -2.6), _mat(Color(0.24, 0.16, 0.1)), Vector3.ZERO, 8)
+	_shadow(Vector3(3.1, 0, -2.6), Vector2(0.4, 0.4), 0.55)
+	var leaf := _mat(Color(0.3, 0.6, 0.3), 6, Color.BLACK, 30.0)
+	var leaf2 := _mat(Color(0.4, 0.7, 0.32), 6, Color.BLACK, 30.0)
+	for i in 9:
+		var a := TAU * i / 9.0 + 0.3
+		var out := 0.5 if i % 2 == 0 else 0.26
+		var tall := 0.5 if i % 2 == 0 else 0.66
+		_lump(Vector3(0.13, tall, 0.035), Vector3(3.1 + sin(a) * (0.05 + out * 0.22), 0.36 + tall * 0.46, -2.6 + cos(a) * (0.05 + out * 0.22)),
+			leaf if i % 3 else leaf2, null, 1.0, Vector3(cos(a) * out, a, -sin(a) * out))
 
-	# Water cooler.
-	_box(Vector3(0.36, 1.0, 0.36), Vector3(3.25, 0.5, 1.2), _mat(Color(0.85, 0.85, 0.82)), true)
-	_cyl(0.15, 0.4, Vector3(3.25, 1.2, 1.2), _mat(Color(0.3, 0.55, 0.85), 0, Color.BLACK, 24.0, Color(0.05, 0.1, 0.2)))
-	_box(Vector3(0.04, 0.04, 0.04), Vector3(3.05, 0.8, 1.2), _mat(Color(0.2, 0.3, 0.8)))
+	# Water cooler: a jug upside down on a white stand, two taps, a cup tube.
+	var cooler := _mat(Color(0.87, 0.87, 0.83), 6, Color.BLACK, 40.0)
+	var water := _mat(Color(0.3, 0.55, 0.85), 0, Color.BLACK, 24.0, Color(0.05, 0.1, 0.2))
+	_box(Vector3(0.36, 0.98, 0.36), Vector3(3.25, 0.49, 1.2), cooler, true)
+	_box(Vector3(0.26, 0.2, 0.06), Vector3(3.06, 0.76, 1.2), _mat(Color(0.7, 0.7, 0.68)), false, Vector3(0, PI / 2, 0))
+	_box(Vector3(0.2, 0.02, 0.1), Vector3(3.03, 0.62, 1.2), _mat(Color(0.3, 0.3, 0.32)), false, Vector3(0, PI / 2, 0))
+	_cyl(0.07, 0.1, Vector3(3.25, 1.03, 1.2), water, Vector3.ZERO, 8, 0.14)
+	_cyl(0.15, 0.3, Vector3(3.25, 1.23, 1.2), water, Vector3.ZERO, 8, 0.145)
+	_cyl(0.145, 0.04, Vector3(3.25, 1.4, 1.2), water, Vector3.ZERO, 8, 0.1)
+	_box(Vector3(0.04, 0.05, 0.04), Vector3(3.05, 0.8, 1.13), _mat(Color(0.2, 0.3, 0.85)))
+	_box(Vector3(0.04, 0.05, 0.04), Vector3(3.05, 0.8, 1.27), _mat(Color(0.85, 0.2, 0.2)))
+	_cyl(0.04, 0.3, Vector3(3.3, 0.75, 0.98), _mat(Color(0.94, 0.94, 0.9)), Vector3.ZERO, 7)
+
+	# Coat rack by the back wall: a jacket somebody forgot, and a hat.
+	var rack := _mat(Color(0.42, 0.28, 0.17), 3, Color(0.35, 0.23, 0.14), 60.0)
+	var rack_at := Vector3(2.4, 0, -2.72)
+	_cyl(0.17, 0.04, rack_at + Vector3(0, 0.02, 0), rack, Vector3.ZERO, 8, 0.12)
+	_cyl(0.025, 1.7, rack_at + Vector3(0, 0.87, 0), rack, Vector3.ZERO, 6, 0.02)
+	for i in 4:
+		var a := TAU * i / 4.0 + 0.4
+		_cyl(0.012, 0.16, rack_at + Vector3(sin(a) * 0.06, 1.62, cos(a) * 0.06), rack, Vector3(cos(a) * 0.9, 0, -sin(a) * 0.9), 5)
+	_lump(Vector3(0.3, 0.62, 0.16), rack_at + Vector3(-0.1, 1.25, -0.05), _mat(Color(0.34, 0.4, 0.3), 6, Color.BLACK, 40.0), null, 0.75, Vector3(0, 0.5, 0.05))
+	_lump(Vector3(0.24, 0.09, 0.24), rack_at + Vector3(0.02, 1.76, 0.02), _mat(Color(0.5, 0.36, 0.22), 6, Color.BLACK, 40.0), null, 0.8, Vector3(0.15, 0, 0.1))
+	_lump(Vector3(0.36, 0.025, 0.36), rack_at + Vector3(0.02, 1.725, 0.02), _mat(Color(0.5, 0.36, 0.22), 6, Color.BLACK, 40.0), null, 0.9, Vector3(0.15, 0, 0.1))
+	_shadow(rack_at, Vector2(0.4, 0.4), 0.45)
+
+	# A stack of moving boxes nobody ever unpacked, by the filing cabinet.
+	var card := _mat(Color(0.72, 0.56, 0.38), 6, Color.BLACK, 40.0)
+	var tape := _mat(Color(0.86, 0.76, 0.56))
+	for spec in [[Vector3(0.46, 0.34, 0.4), Vector3(-2.55, 0.17, -2.68), 0.12], [Vector3(0.38, 0.28, 0.34), Vector3(-2.58, 0.48, -2.7), -0.2]]:
+		_box(spec[0], spec[1], card, true, Vector3(0, spec[2], 0))
+		_box(Vector3(spec[0].x + 0.006, 0.006, 0.06), spec[1] + Vector3(0, spec[0].y * 0.5, 0), tape, false, Vector3(0, spec[2], 0))
+	_label("DESK\nSTUFF", Vector3(-2.55, 0.2, -2.475), 7, Color(0.25, 0.18, 0.12), Vector3(0, 0.12, 0.05))
 
 	# Trash can.
-	_cyl(0.15, 0.34, Vector3(-1.05, 0.17, -2.55), _mat(Color(0.3, 0.32, 0.3)), Vector3.ZERO, 8, 0.17)
+	_cyl(0.13, 0.34, Vector3(-1.05, 0.17, -2.55), _mat(Color(0.3, 0.32, 0.3), 6, Color.BLACK, 40.0), Vector3.ZERO, 8, 0.17)
+	var scrap := _mat(Color(0.95, 0.94, 0.88))
+	for at in [Vector3(-1.07, 0.33, -2.57), Vector3(-1.0, 0.34, -2.5), Vector3(-0.82, 0.04, -2.3), Vector3(-1.2, 0.035, -2.25)]:
+		_lump(Vector3(0.08, 0.07, 0.08), at, scrap, null, 1.0, Vector3(at.x * 7.0, at.z * 5.0, 0))
+	_shadow(Vector3(-1.05, 0, -2.55), Vector2(0.3, 0.3), 0.5)
 
 	# Poster above the desk: the game's own flyer.
 	_box(Vector3(0.7, 0.9, 0.01), Vector3(-1.5, 1.6, -2.99), _mat(Color(0.08, 0.05, 0.1)))
+	_tape(Vector3(-1.5, 1.6, -2.98), Vector2(0.7, 0.9))
 	_label("KILLIN'\nIN", Vector3(-1.5, 1.88, -2.98), 22, Color(1.0, 0.35, 0.7))
 	_label("COMEDY", Vector3(-1.5, 1.68, -2.98), 22, Color(0.35, 0.85, 1.0))
 	_label("OPEN MIC\nTONITE\n8PM", Vector3(-1.5, 1.38, -2.98), 12, Color(1.0, 0.85, 0.3))
 	# Motivational poster.
 	_box(Vector3(0.6, 0.45, 0.01), Vector3(1.6, 1.65, -2.99), _mat(Color(0.05, 0.05, 0.05)))
+	_tape(Vector3(1.6, 1.65, -2.98), Vector2(0.6, 0.45))
 	_box(Vector3(0.5, 0.28, 0.005), Vector3(1.6, 1.7, -2.985), _mat(Color(0.35, 0.5, 0.7), 4, Color(0.3, 0.42, 0.62)))
 	_label("PERSEVERANCE", Vector3(1.6, 1.5, -2.98), 9, Color(0.9, 0.9, 0.85))
 
@@ -1379,7 +1476,11 @@ func _build_props() -> void:
 	clock.position = Vector3(3.48, 2.0, 2.3)
 	clock.rotation.y = -PI / 2
 	_world_vp.add_child(clock)
-	_cyl(0.18, 0.04, Vector3.ZERO, _mat(Color(0.92, 0.92, 0.88)), Vector3(PI / 2, 0, 0), 10, -1.0, clock)
+	_cyl(0.2, 0.035, Vector3(0, 0, -0.005), _mat(Color(0.2, 0.2, 0.22)), Vector3(PI / 2, 0, 0), 12, -1.0, clock)
+	_cyl(0.175, 0.04, Vector3.ZERO, _mat(Color(0.94, 0.93, 0.87)), Vector3(PI / 2, 0, 0), 12, -1.0, clock)
+	for i in 12:
+		var a := TAU * i / 12.0
+		_box(Vector3(0.012, 0.03 if i % 3 == 0 else 0.016, 0.004), Vector3(sin(a) * 0.145, cos(a) * 0.145, 0.022), dark, false, Vector3(0, 0, -a), clock)
 	for spec in [[0.09, 0.016], [0.14, 0.01]]:
 		var pivot := Node3D.new()
 		pivot.position.z = 0.025
@@ -1391,8 +1492,60 @@ func _build_props() -> void:
 	_label("<- ELEVATOR", Vector3(0.1, 1.95, 3.99), 24, Color(0.9, 0.9, 0.8), Vector3(0, PI, 0))
 
 
+## A swivel chair facing local +z: a soft cushion and back, a gas lift and a
+## five-star base on casters. `solid` = you bump into the seat.
+## `dark` / `steel` = the frame's materials (the other floors pass their own,
+## lit by their own lights).
+func _chair(parent: Node3D, fabric: Material, solid := false, back := 0.56, dark: Material = null, steel: Material = null) -> void:
+	if dark == null:
+		dark = _mat(Color(0.1, 0.1, 0.11))
+	if steel == null:
+		steel = _mat(Color(0.55, 0.56, 0.58))
+	_box(Vector3(0.42, 0.05, 0.4), Vector3(0, 0.36, 0), dark, solid, Vector3.ZERO, parent)
+	_lump(Vector3(0.52, 0.11, 0.5), Vector3(0, 0.41, 0.0), fabric, parent, 0.6)
+	_lump(Vector3(0.48, back, 0.12), Vector3(0, 0.52 + back * 0.5, -0.28), fabric, parent, 0.6, Vector3(0.12, 0, 0))
+	_box(Vector3(0.06, 0.3, 0.03), Vector3(0, 0.48, -0.28), dark, false, Vector3(0.12, 0, 0), parent)
+	for side in [-1.0, 1.0]:
+		_box(Vector3(0.03, 0.2, 0.03), Vector3(side * 0.27, 0.5, -0.04), dark, false, Vector3.ZERO, parent)
+		_lump(Vector3(0.06, 0.04, 0.26), Vector3(side * 0.27, 0.61, -0.02), dark, parent, 0.7)
+	_cyl(0.028, 0.26, Vector3(0, 0.22, 0), steel, Vector3.ZERO, 6, -1.0, parent)
+	_lump(Vector3(0.1, 0.07, 0.1), Vector3(0, 0.1, 0), dark, parent)
+	for i in 5:
+		var a := TAU * i / 5.0
+		_box(Vector3(0.045, 0.03, 0.28), Vector3(sin(a) * 0.14, 0.085, cos(a) * 0.14), dark, false, Vector3(0.12, a, 0), parent)
+		_lump(Vector3(0.05, 0.05, 0.05), Vector3(sin(a) * 0.27, 0.03, cos(a) * 0.27), dark, parent)
+	if parent.is_inside_tree():
+		_shadow(parent.global_position, Vector2(0.5, 0.5), 0.45, 0.0, parent)
+
+
+## Four bits of yellowed tape holding a poster `size` across to the wall at
+## pos (facing +z in parent space), none of them straight.
+func _tape(pos: Vector3, size: Vector2, parent: Node = null) -> void:
+	var tape := _mat(Color(0.9, 0.84, 0.62))
+	var i := 0
+	for sx in [-1.0, 1.0]:
+		for sy in [-1.0, 1.0]:
+			i += 1
+			_box(Vector3(0.09, 0.03, 0.004), pos + Vector3(sx * (size.x * 0.5 - 0.01), sy * (size.y * 0.5 - 0.01), 0.004), tape, false,
+				Vector3(0, 0, sx * sy * -0.75 + sin(i * 7.3 + pos.x * 3.0) * 0.25), parent)
+
+
+## A mug with a handle (turned toward +x) and something in it.
+func _mug(pos: Vector3, mat: Material, parent: Node = null, drink := Color(0.33, 0.19, 0.1), turn := 0.0) -> Node3D:
+	var n := Node3D.new()
+	n.position = pos
+	n.rotation.y = turn
+	(parent if parent else _world_vp).add_child(n)
+	_cyl(0.04, 0.1, Vector3(0, 0.05, 0), mat, Vector3.ZERO, 8, 0.046, n)
+	_cyl(0.037, 0.006, Vector3(0, 0.099, 0), _mat(drink), Vector3.ZERO, 8, -1.0, n)
+	_box(Vector3(0.034, 0.014, 0.014), Vector3(0.056, 0.075, 0), mat, false, Vector3.ZERO, n)
+	_box(Vector3(0.034, 0.014, 0.014), Vector3(0.056, 0.03, 0), mat, false, Vector3.ZERO, n)
+	_box(Vector3(0.014, 0.058, 0.014), Vector3(0.07, 0.0525, 0), mat, false, Vector3.ZERO, n)
+	return n
+
+
 ## Dale's corner under the window: a cluttered desk facing into the room, and
-## Dale himself behind it, built from chunky PS1 boxes like everything else.
+## Dale himself behind it, a hand-made puppet like everyone else (puppet.gd).
 func _build_dale() -> void:
 	_dale = Node3D.new()
 	_dale.position = DALE_SPOT
@@ -1402,17 +1555,10 @@ func _build_dale() -> void:
 	var wood := _mat(Color(0.7, 0.52, 0.34), 3, Color(0.62, 0.45, 0.28), 60.0)
 	var metal := _mat(Color(0.55, 0.56, 0.56))
 	var dark := _mat(Color(0.1, 0.1, 0.11))
-	var skin := _mat(Color(0.93, 0.72, 0.58))
-	var shirt := _mat(Color(0.86, 0.84, 0.66), 6, Color.BLACK, 40.0)
-	var hair := _mat(Color(0.36, 0.24, 0.15))
-	var tie := _mat(Color(0.62, 0.12, 0.42), 4, Color(0.5, 0.08, 0.34), 40.0)
-	var pants := _mat(Color(0.22, 0.24, 0.3))
 
 	# Chair behind him.
 	var fabric := _mat(Color(0.6, 0.36, 0.28), 1, Color(0.52, 0.3, 0.24), 50.0)
-	_box(Vector3(0.56, 0.08, 0.5), Vector3(0, 0.46, 0), fabric, false, Vector3.ZERO, r)
-	_box(Vector3(0.54, 0.62, 0.08), Vector3(0, 0.86, -0.3), fabric, false, Vector3(0.12, 0, 0), r)
-	_cyl(0.03, 0.4, Vector3(0, 0.22, 0), dark, Vector3.ZERO, 6, -1.0, r)
+	_chair(r, fabric, false, 0.66)
 
 	# Desk in front of him (top at 0.76), with a modesty panel facing the room.
 	var dz := 0.62
@@ -1427,72 +1573,42 @@ func _build_dale() -> void:
 	_label("DALE P.\nACCTS RECEIVABLE", Vector3(0.0, 0.797, dz + 0.258), 7, Color(0.15, 0.1, 0.05), Vector3(-0.3, 0, 0), 0.0, r)
 	# His old monitor, turned away to the side so you can see him.
 	var beige := _beige()
-	_box(Vector3(0.36, 0.3, 0.3), Vector3(-0.5, 0.95, dz - 0.12), beige, false, Vector3(0, -0.9, 0), r)
-	_box(Vector3(0.2, 0.03, 0.18), Vector3(-0.5, 0.78, dz - 0.12), beige, false, Vector3(0, -0.9, 0), r)
+	var old_pc := Node3D.new()
+	old_pc.position = Vector3(-0.5, 0.76, dz - 0.12)
+	old_pc.rotation.y = PI - 0.9
+	r.add_child(old_pc)
+	_box(Vector3(0.36, 0.3, 0.07), Vector3(0, 0.2, 0.12), beige, false, Vector3.ZERO, old_pc)
+	_box(Vector3(0.3, 0.25, 0.14), Vector3(0, 0.2, 0.02), beige, false, Vector3.ZERO, old_pc)
+	_box(Vector3(0.2, 0.17, 0.12), Vector3(0, 0.2, -0.1), beige, false, Vector3.ZERO, old_pc)
+	_box(Vector3(0.28, 0.2, 0.004), Vector3(0, 0.215, 0.157), _mat(Color(0.05, 0.06, 0.05), 0, Color.BLACK, 24.0, Color(0.05, 0.16, 0.08)), false, Vector3.ZERO, old_pc)
+	_box(Vector3(0.12, 0.04, 0.12), Vector3(0, 0.035, 0.02), beige, false, Vector3.ZERO, old_pc)
+	_box(Vector3(0.22, 0.02, 0.2), Vector3(0, 0.01, 0.02), beige, false, Vector3.ZERO, old_pc)
 	# A purple sticky note on its side. Hmm.
-	_box(Vector3(0.07, 0.07, 0.004), Vector3(-0.38, 1.0, dz + 0.04), _mat(Color(0.72, 0.5, 0.95)), false, Vector3(0, -0.9, 0.1), r)
+	_box(Vector3(0.07, 0.07, 0.004), Vector3(0.03, 0.21, -0.163), _mat(Color(0.72, 0.5, 0.95)), false, Vector3(0, PI, 0.1), old_pc)
+	# His desk lamp (it lights the corner after hours: ps1.gdshader N_POS3).
+	var brass := _mat(Color(0.7, 0.56, 0.26))
+	var lamp := Vector3(-0.56, 0.76, dz + 0.2)
+	_cyl(0.07, 0.02, lamp + Vector3(0, 0.01, 0), brass, Vector3.ZERO, 8, 0.06, r)
+	_cyl(0.01, 0.3, lamp + Vector3(-0.03, 0.16, 0), brass, Vector3(0, 0, 0.2), 5, -1.0, r)
+	_cyl(0.01, 0.16, lamp + Vector3(0.05, 0.33, 0.0), brass, Vector3(0, 0, -0.9), 5, -1.0, r)
+	_cyl(0.085, 0.09, lamp + Vector3(0.14, 0.34, 0.0), _mat(Color(0.2, 0.42, 0.3), 6, Color.BLACK, 40.0), Vector3(0, 0, -0.5), 8, 0.04, r)
+	var bulb := _mat(Color(0.3, 0.26, 0.16), 0, Color.BLACK, 24.0, Color(0.5, 0.4, 0.2))
+	_night_glow.append([bulb, Color(0.5, 0.4, 0.2), Color(1.0, 0.85, 0.5)])
+	_lump(Vector3(0.07, 0.05, 0.07), lamp + Vector3(0.125, 0.315, 0.0), bulb, r)
 	# Mug, invoices, a purple pen.
-	_cyl(0.045, 0.1, Vector3(0.42, 0.81, dz + 0.08), _mat(Color(0.95, 0.95, 0.92)), Vector3.ZERO, 8, -1.0, r)
+	_mug(Vector3(0.42, 0.76, dz + 0.08), _mat(Color(0.95, 0.95, 0.92)), r, Color(0.33, 0.19, 0.1), -0.9)
 	_label("#1\nDAD", Vector3(0.42, 0.815, dz + 0.127), 5, Color(0.2, 0.3, 0.7), Vector3.ZERO, 0.0, r)
 	_box(Vector3(0.24, 0.05, 0.3), Vector3(0.18, 0.785, dz - 0.02), _mat(Color(0.92, 0.92, 0.86)), false, Vector3(0, 0.15, 0), r)
 	_box(Vector3(0.012, 0.012, 0.14), Vector3(0.05, 0.768, dz + 0.12), _mat(Color(0.55, 0.25, 0.85)), false, Vector3(0, 0.7, 0), r)
 
-	# Dale. The body breathes; the head turns to look at you.
+	# Dale himself (scenes/office/puppet.gd): seated, forearms on the desk.
+	# The body breathes; the head turns to look at you.
 	_dale_body = Node3D.new()
-	_dale_body.position = Vector3(0, 0.5, 0)
 	r.add_child(_dale_body)
-	var b := _dale_body
-	# Legs, mostly hidden by the desk.
-	_box(Vector3(0.44, 0.16, 0.42), Vector3(0, 0.06, 0.16), pants, false, Vector3.ZERO, b)
-	# Belly and chest: a big round shirt.
-	_ball(0.31, Vector3(0, 0.3, 0.05), shirt, b, Vector3(1.05, 1.0, 0.95))
-	_ball(0.26, Vector3(0, 0.52, -0.02), shirt, b, Vector3(1.15, 0.8, 0.9))
-	# Tie, riding the curve of the belly.
-	_box(Vector3(0.07, 0.04, 0.03), Vector3(0, 0.66, 0.17), tie, false, Vector3.ZERO, b)
-	_box(Vector3(0.06, 0.24, 0.02), Vector3(0, 0.52, 0.24), tie, false, Vector3(0.25, 0, 0), b)
-	_box(Vector3(0.06, 0.12, 0.02), Vector3(0, 0.34, 0.33), tie, false, Vector3(-0.15, 0, 0), b)
-	# Shoulders, sleeves and arms resting on the desk.
-	for side in [-1, 1]:
-		_ball(0.1, Vector3(side * 0.3, 0.6, -0.02), shirt, b)
-		_box(Vector3(0.12, 0.26, 0.12), Vector3(side * 0.34, 0.46, 0.04), shirt, false, Vector3(0.5, 0, side * 0.12), b)
-		_box(Vector3(0.1, 0.1, 0.3), Vector3(side * 0.3, 0.3, 0.26), skin, false, Vector3(0.0, -side * 0.25, 0), b)
-		_box(Vector3(0.1, 0.06, 0.1), Vector3(side * 0.22, 0.29, 0.42), skin, false, Vector3.ZERO, b)
-	# Neck and double chin.
-	_box(Vector3(0.2, 0.08, 0.18), Vector3(0, 0.7, 0.0), skin, false, Vector3.ZERO, b)
-	_dale_head = Node3D.new()
-	_dale_head.position = Vector3(0, 0.74, 0.0)
-	b.add_child(_dale_head)
-	var h := _dale_head
-	_box(Vector3(0.27, 0.27, 0.25), Vector3(0, 0.15, 0.02), skin, false, Vector3.ZERO, h)
-	_box(Vector3(0.23, 0.06, 0.06), Vector3(0, 0.02, 0.12), skin, false, Vector3.ZERO, h)
-	# Bald on top, a horseshoe of brown hair around the sides and back.
-	_box(Vector3(0.29, 0.1, 0.12), Vector3(0, 0.2, -0.07), hair, false, Vector3.ZERO, h)
-	for side in [-1, 1]:
-		_box(Vector3(0.03, 0.1, 0.16), Vector3(side * 0.14, 0.19, 0.0), hair, false, Vector3.ZERO, h)
-		# Ears.
-		_box(Vector3(0.03, 0.06, 0.04), Vector3(side * 0.145, 0.14, 0.03), skin, false, Vector3.ZERO, h)
-	# Glasses: two dark frames and a bridge, eyes behind.
-	var frame := _mat(Color(0.08, 0.08, 0.1))
-	var glass := _mat(Color(0.75, 0.85, 0.9), 0, Color.BLACK, 24.0, Color(0.12, 0.15, 0.18))
-	for side in [-1, 1]:
-		_box(Vector3(0.09, 0.065, 0.01), Vector3(side * 0.06, 0.17, 0.146), frame, false, Vector3.ZERO, h)
-		_box(Vector3(0.07, 0.045, 0.01), Vector3(side * 0.06, 0.17, 0.149), glass, false, Vector3.ZERO, h)
-		var eye := Node3D.new()
-		eye.position = Vector3(side * 0.06, 0.17, 0.155)
-		h.add_child(eye)
-		_box(Vector3(0.022, 0.026, 0.006), Vector3.ZERO, dark, false, Vector3.ZERO, eye)
-		_dale_eyes.append(eye)
-		# Eyebrows.
-		_box(Vector3(0.07, 0.014, 0.01), Vector3(side * 0.06, 0.218, 0.15), hair, false, Vector3(0, 0, side * -0.12), h)
-	_box(Vector3(0.03, 0.012, 0.01), Vector3(0, 0.175, 0.15), frame, false, Vector3.ZERO, h)
-	# Nose, moustache, mouth (it opens while he talks).
-	_box(Vector3(0.045, 0.05, 0.04), Vector3(0, 0.12, 0.155), _mat(Color(0.9, 0.6, 0.5)), false, Vector3.ZERO, h)
-	_box(Vector3(0.12, 0.025, 0.02), Vector3(0, 0.085, 0.148), hair, false, Vector3.ZERO, h)
-	_dale_mouth = Node3D.new()
-	_dale_mouth.position = Vector3(0, 0.058, 0.146)
-	h.add_child(_dale_mouth)
-	_box(Vector3(0.07, 0.03, 0.01), Vector3.ZERO, _mat(Color(0.35, 0.1, 0.1)), false, Vector3.ZERO, _dale_mouth)
-	_dale_mouth.scale.y = 0.25
+	var parts: Dictionary = Puppet.build(self, _dale_body, _ladder.LOOKS.dale, _mat, "desk")
+	_dale_head = parts.head
+	_dale_mouth = parts.mouth
+	_dale_eyes.assign(parts.eyes)
 
 	# A floating "!" when he has something new to tell you.
 	_dale_alert = _label("!", Vector3(0, 1.72, 0), 48, Color(1.0, 0.85, 0.3), Vector3.ZERO, 0.0, r)
@@ -1501,19 +1617,27 @@ func _build_dale() -> void:
 
 
 ## A low-poly sphere (faceted, like the rest of the room).
-func _ball(radius: float, pos: Vector3, mat: Material, parent: Node3D, squash := Vector3.ONE) -> MeshInstance3D:
-	var mesh := SphereMesh.new()
-	mesh.radius = radius
-	mesh.height = radius * 2.0
-	mesh.radial_segments = 10
-	mesh.rings = 5
+## A lump of clay (Handmade.blob): a ball, squashed by `squash`; soft < 1
+## flattens it toward a pillow with rounded corners (heads, cushions).
+func _ball(radius: float, pos: Vector3, mat: Material, parent: Node3D, squash := Vector3.ONE, soft := 1.0) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
+	mi.mesh = Handmade.blob(Vector3.ONE * radius * 2.0 * squash, soft, 10, Handmade.variant_at(pos))
 	mi.material_override = mat
 	mi.layers = LAYER_WORLD
 	mi.position = pos
-	mi.scale = squash
 	parent.add_child(mi)
+	return mi
+
+
+## A lump of clay `dims` across (Handmade.blob), optionally turned.
+func _lump(dims: Vector3, pos: Vector3, mat: Material, parent: Node, soft := 1.0, rot := Vector3.ZERO) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = Handmade.blob(dims, soft, 10, Handmade.variant_at(pos + dims))
+	mi.material_override = mat
+	mi.layers = LAYER_WORLD
+	mi.position = pos
+	mi.rotation = rot
+	(parent if parent else _world_vp).add_child(mi)
 	return mi
 
 

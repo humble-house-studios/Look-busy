@@ -99,11 +99,14 @@ func build(ladder: Node, lift_id: String, low: String, high: String) -> void:
 	var car := "lift_" + id
 	_btn_off = hub._mat(car, Color(0.55, 0.52, 0.46))
 	_btn_on = hub._mat(car, Color(0.3, 0.25, 0.1), 0, Color.BLACK, 24.0, Color(1.0, 0.8, 0.3))
+	# The car and its sliding doors stay exact boxes: they have to meet.
+	hub.office._exact = true
 	if two_sided():
 		_build_car(car)
 	for s in [-1, 1]:
 		if rooms[s] != "":
 			_build_face(s, car)
+	hub.office._exact = false
 	_sfx = AudioStreamPlayer3D.new()
 	_sfx.bus = "Effects"
 	_sfx.unit_size = 3.0

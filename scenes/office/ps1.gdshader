@@ -28,6 +28,10 @@ uniform vec3 room_fog = vec3(-1.0);
 uniform float after_hours = 0.0;
 
 varying vec4 aff;
+// Hand-made shapes (addons/hh_minigames/_shared/handmade.gd) paint themselves
+// through vertex colour: r = 0 on a bevelled edge, g = height up the piece,
+// b = the piece's own paint mix. Plain meshes read as all 1s (no change).
+varying vec3 paint;
 varying vec3 light;
 varying vec3 wnormal;
 varying float fog;
@@ -56,6 +60,14 @@ float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
+// Soft blotches (value noise), for paint that went on thicker here than there.
+float blotch(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+
 void vertex() {
 	vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	vec3 n = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
@@ -78,7 +90,11 @@ void vertex() {
 			lit += room_col[i] * att * att * (0.3 + 0.7 * max(dot(n, d / dist), 0.0));
 		}
 	}
+	// Grime where things meet the floor: walls and furniture darken toward
+	// their feet (not the floor itself), which sits everything down.
+	lit *= mix(1.0, mix(0.7, 1.0, smoothstep(0.0, 0.55, wp.y)), 1.0 - max(n.y, 0.0));
 	light = lit;
+	paint = COLOR.rgb;
 	wnormal = n;
 	vec4 view = VIEW_MATRIX * vec4(wp, 1.0);
 	// A faint warm haze at the far end of the room (not dark fog); after
@@ -103,7 +119,7 @@ void fragment() {
 	float h = hash(tp);
 	vec3 col = albedo;
 	if (pattern == 1) {
-		col = mix(albedo, albedo2, step(0.6, h)) * (0.85 + 0.3 * hash(tp + 7.0));
+		col = mix(albedo, albedo2, step(0.6, h)) * (0.9 + 0.2 * hash(tp + 7.0));
 	} else if (pattern == 2) {
 		vec2 f = fract(p / 0.6);
 		float edge = step(0.93, max(f.x, f.y));
@@ -117,12 +133,26 @@ void fragment() {
 		vec2 c = floor(p / 0.3);
 		col = mix(albedo, albedo2, mod(c.x + c.y, 2.0)) * (0.92 + 0.12 * h);
 	} else if (pattern == 6) {
-		col = albedo * (0.9 + 0.2 * h);
+		col = albedo * (0.96 + 0.08 * h);
 	} else if (pattern == 7) {
 		vec2 f = fract(p * vec2(38.0, 30.0));
 		col = mix(albedo2, albedo, step(0.22, min(f.x, f.y)));
 	}
-	col = col * light + emission;
+	// Hand-painted: blotchy coats, long brush strokes, and each piece mixed a
+	// little differently, all on the chunky texel grid.
+	vec2 along = an.y > max(an.x, an.z) ? tp : tp.yx;
+	float coat = blotch(tp / 7.0) - 0.5;
+	float stroke = hash(vec2(floor(along.x / 9.0 + coat), along.y)) - 0.5;
+	col *= 1.0 + coat * 0.16 + stroke * 0.07;
+	col *= mix(0.86, 1.0, paint.b) * mix(0.9, 1.03, paint.g);
+	// Dry-brushed edges: lighter where a bevel faces up, darker underneath.
+	col *= mix(1.0, mix(0.72, 1.4, clamp(wnormal.y * 0.6 + 0.55, 0.0, 1.0)), 1.0 - paint.r);
+	col = col * light;
+	// A soft shoulder on the brightest light, so things in the sun keep their
+	// shape and colour instead of burning out to flat yellow (glows stay hot).
+	vec3 over = max(col - 0.68, vec3(0.0));
+	col = min(col, vec3(0.68)) + over / (1.0 + over * 1.7);
+	col += emission;
 	float ah = clamp(after_hours, 0.0, 1.0) * office_lights;
 	col = mix(col, room_fog.x < 0.0 ? mix(FOG_COL, N_FOG_COL, ah) : room_fog, fog);
 	// Grade: lift the shadows toward peach (golden hour), or blue after hours.

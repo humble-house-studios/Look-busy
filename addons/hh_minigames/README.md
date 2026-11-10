@@ -66,7 +66,10 @@ The office's economy is passed in, never named: games only call these on
 - Shared bits live in `_shared/`: the controller frame (`pad_cursor.gd`), the
   phone safe area, fonts, the common sounds, the machine base (`machine.gd`),
   the glass cage (`cage3d.gd`, `glass`/`retro3d` shaders), arcade numbers
-  (`arcade_rules.gd`) and missions.
+  (`arcade_rules.gd`) and missions, and the hand-made shapes every 3D model
+  is built from (`handmade.gd`: bevelled boxes, turned tubes, lumps of clay;
+  `cage3d.gd`'s `box` / `cyl` / `ball` use them, so build with those, never
+  Godot's own BoxMesh and friends).
 - Games read the controller from input events, never `Input` polling, so a pad
   never leaks between desks.
 - Look games up with `HHMinigames` (`minigames.gd`): `scene_for(id)`,

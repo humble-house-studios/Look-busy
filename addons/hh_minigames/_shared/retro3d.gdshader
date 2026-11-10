@@ -25,6 +25,10 @@ uniform vec2 snap = vec2(120.0, 140.0);
 uniform float levels = 24.0;
 
 varying vec3 light;
+// Hand-made shapes (handmade.gd) paint themselves through vertex colour:
+// r = 0 on a bevelled edge, g = height up the piece, b = its own paint mix.
+varying vec3 paint;
+varying float up;
 varying vec3 glint;
 varying float fogv;
 varying vec3 lpos;
@@ -52,6 +56,8 @@ void vertex() {
 		g += l_col[i] * att * pow(max(dot(n, normalize(ld + eye)), 0.0), 24.0);
 	}
 	light = lit;
+	paint = COLOR.rgb;
+	up = n.y;
 	glint = g * shine;
 	lpos = VERTEX;
 	vec4 vp = VIEW_MATRIX * vec4(wp, 1.0);
@@ -79,6 +85,11 @@ void fragment() {
 		float edge = step(f.x, 0.07) + step(f.z, 0.07) + step(f.y, 0.07);
 		base = edge > 0.0 ? albedo2 : albedo;
 	}
+	// Hand-painted: each piece mixed a little differently, bevels dry-brushed
+	// (lighter facing up, darker underneath), and a blotchy coat.
+	float coat = hash(floor(lpos * 9.0)) - 0.5;
+	base *= (1.0 + coat * 0.07) * mix(0.86, 1.0, paint.b) * mix(0.9, 1.03, paint.g);
+	base *= mix(1.0, mix(0.72, 1.4, clamp(up * 0.6 + 0.55, 0.0, 1.0)), 1.0 - paint.r);
 	vec3 col = base * light + glint + emission;
 	col = mix(col, fog_col, fogv);
 	ivec2 fc = ivec2(FRAGCOORD.xy) % 4;

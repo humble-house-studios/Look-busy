@@ -236,7 +236,7 @@ const FACE := Basis(Vector3.UP, -PI / 2)
 func _dummy_mats() -> void:
 	var v = _v
 	_dm = {
-		"shirt": v.mat(Color(0.82, 0.8, 0.62), {"shine": 0.2}),
+		"shirt": v.mat(Color(0.7, 0.8, 0.88), {"shine": 0.2}),
 		"skin": v.mat(Color(0.86, 0.66, 0.52), {"shine": 0.3}),
 		"pants": v.mat(Color(0.22, 0.24, 0.3)),
 		"shoe": v.mat(Color(0.12, 0.08, 0.06), {"shine": 0.6}),

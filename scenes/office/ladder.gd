@@ -210,6 +210,9 @@ func _shell(room: String, z0: float, z1: float, h: float, wall: Material, floor_
 	var p: Node3D = _rooms[room]
 	var depth := z1 - z0
 	var cz := (z0 + z1) * 0.5
+	# Walls, floor and ceiling stay exact boxes (no hand-made wobble) so the
+	# room has no gaps.
+	office._exact = true
 	# This room's face of the wall you came through (the far side belongs to
 	# the room before), with the same door gap.
 	_wall_with_door(p, z0 + 0.05, h, front_door_x, wall, front_door)
@@ -229,6 +232,7 @@ func _shell(room: String, z0: float, z1: float, h: float, wall: Material, floor_
 		_wall_with_door(p, z1 + 0.05, h, door_x, wall, far_door)
 	else:
 		_box(Vector3(7.2, h, 0.1), Vector3(0, h * 0.5, z1 + 0.05), wall, true, Vector3.ZERO, p)
+	office._exact = false
 
 
 func _wall_with_door(p: Node3D, z: float, h: float, door_x: float, wall: Material, door := false) -> void:
@@ -236,9 +240,12 @@ func _wall_with_door(p: Node3D, z: float, h: float, door_x: float, wall: Materia
 	var gh := DOOR_H if door else LIFT_H
 	var a := door_x - w * 0.5
 	var b := door_x + w * 0.5
+	var was: bool = office._exact
+	office._exact = true
 	_box(Vector3(a + 3.6, h, 0.1), Vector3((-3.6 + a) * 0.5, h * 0.5, z), wall, true, Vector3.ZERO, p)
 	_box(Vector3(3.6 - b, h, 0.1), Vector3((b + 3.6) * 0.5, h * 0.5, z), wall, true, Vector3.ZERO, p)
 	_box(Vector3(w, h - gh, 0.1), Vector3(door_x, gh + (h - gh) * 0.5, z), wall, true, Vector3.ZERO, p)
+	office._exact = was
 
 
 ## A door in a gap: a hinged panel that swings open once it's unlocked.
@@ -512,87 +519,23 @@ func _machine(id: String, script: String, room: String, screen: Node3D, size: Ve
 	_machines[id] = {"vp": vp, "node": m, "pc": pc, "room": room, "active": false, "cage": cage}
 
 
-## A standing (or seated) coworker built from PS1 boxes. Returns their root.
+## A standing (or seated) coworker: a hand-made puppet (scenes/office/puppet.gd). Returns their root.
 func _person(room: String, id: String, at: Vector3, yaw: float, look: Dictionary, seated := false) -> Node3D:
 	var p: Node = _rooms[room] if _rooms.has(room) else office._world_vp
 	var root := Node3D.new()
 	root.position = at
 	root.rotation.y = yaw
 	p.add_child(root)
-	var skin := _mat(room, look.get("skin", Color(0.9, 0.7, 0.55)))
-	var shirt := _mat(room, look.get("shirt", Color(0.5, 0.5, 0.6)), 6, Color.BLACK, 40.0)
-	var pants := _mat(room, look.get("pants", Color(0.2, 0.2, 0.25)))
-	var hair := _mat(room, look.get("hair", Color(0.25, 0.18, 0.12)))
-	var dark := _mat(room, Color(0.08, 0.08, 0.1))
-	var wide: float = look.get("wide", 1.0)
+	# The puppet itself: scenes/office/puppet.gd (clay lumps, not boxes).
 	var body := Node3D.new()
-	body.position.y = -0.42 if seated else 0.0
 	root.add_child(body)
-	if not seated:
-		for side in [-1.0, 1.0]:
-			_box(Vector3(0.14, 0.8, 0.16), Vector3(side * 0.1 * wide, 0.4, 0), pants, false, Vector3.ZERO, body)
-			_box(Vector3(0.15, 0.06, 0.24), Vector3(side * 0.1 * wide, 0.03, 0.04), dark, false, Vector3.ZERO, body)
-	_box(Vector3(0.42 * wide, 0.62, 0.26 * wide), Vector3(0, 1.11, 0), shirt, false, Vector3.ZERO, body)
-	for side in [-1.0, 1.0]:
-		_box(Vector3(0.11, 0.58, 0.12), Vector3(side * (0.27 * wide), 1.1, 0.0), shirt, false, Vector3(0, 0, side * 0.08), body)
-		_box(Vector3(0.09, 0.09, 0.1), Vector3(side * (0.29 * wide + 0.02), 0.78, 0.0), skin, false, Vector3.ZERO, body)
-	if look.has("tie"):
-		_box(Vector3(0.06, 0.32, 0.02), Vector3(0, 1.18, 0.135 * wide), _mat(room, look.tie), false, Vector3.ZERO, body)
-	if look.has("strap"):
-		for side in [-1.0, 1.0]:
-			_box(Vector3(0.06, 0.62, 0.02), Vector3(side * 0.12, 1.11, 0.135 * wide), _mat(room, look.strap), false, Vector3.ZERO, body)
-	if look.has("lanyard"):
-		_box(Vector3(0.1, 0.13, 0.02), Vector3(0, 1.02, 0.14 * wide), _mat(room, Color(0.95, 0.95, 0.9)), false, Vector3.ZERO, body)
-	_box(Vector3(0.12, 0.08, 0.12), Vector3(0, 1.45, 0), skin, false, Vector3.ZERO, body)
-	var head := Node3D.new()
-	head.position = Vector3(0, 1.48, 0)
-	body.add_child(head)
-	_box(Vector3(0.25, 0.27, 0.24), Vector3(0, 0.14, 0), skin, false, Vector3.ZERO, head)
-	var eyes: Array = []
-	for side in [-1.0, 1.0]:
-		var e := Node3D.new()
-		e.position = Vector3(side * 0.055, 0.17, 0.122)
-		head.add_child(e)
-		_box(Vector3(0.025, 0.03, 0.006), Vector3.ZERO, dark, false, Vector3.ZERO, e)
-		eyes.append(e)
-		if look.get("glasses", false):
-			_box(Vector3(0.08, 0.06, 0.008), Vector3(side * 0.055, 0.17, 0.128), dark, false, Vector3.ZERO, head)
-			_box(Vector3(0.06, 0.04, 0.008), Vector3(side * 0.055, 0.17, 0.131), _mat(room, Color(0.75, 0.85, 0.9), 0, Color.BLACK, 24.0, Color(0.1, 0.12, 0.15)), false, Vector3.ZERO, head)
-	_box(Vector3(0.04, 0.05, 0.04), Vector3(0, 0.11, 0.13), skin, false, Vector3.ZERO, head)
-	var mouth := Node3D.new()
-	mouth.position = Vector3(0, 0.055, 0.122)
-	head.add_child(mouth)
-	_box(Vector3(0.07, 0.03, 0.01), Vector3.ZERO, _mat(room, Color(0.35, 0.1, 0.1)), false, Vector3.ZERO, mouth)
-	mouth.scale.y = 0.25
-	match look.get("hair_style", "short"):
-		"short":
-			_box(Vector3(0.27, 0.08, 0.26), Vector3(0, 0.3, -0.005), hair, false, Vector3.ZERO, head)
-		"bob":
-			_box(Vector3(0.29, 0.1, 0.27), Vector3(0, 0.3, -0.01), hair, false, Vector3.ZERO, head)
-			for side in [-1.0, 1.0]:
-				_box(Vector3(0.04, 0.22, 0.22), Vector3(side * 0.145, 0.16, -0.02), hair, false, Vector3.ZERO, head)
-			_box(Vector3(0.28, 0.22, 0.05), Vector3(0, 0.16, -0.13), hair, false, Vector3.ZERO, head)
-		"curls":
-			for i in 7:
-				var a := -PI * 0.1 + i * PI * 1.2 / 6.0
-				office._ball(0.08, Vector3(cos(a) * 0.15, 0.24 + sin(a) * 0.08, -0.02 - absf(cos(a)) * 0.02), hair, head)
-			office._ball(0.13, Vector3(0, 0.3, -0.06), hair, head, Vector3(1.4, 0.8, 1.2))
-		"slick":
-			_box(Vector3(0.27, 0.06, 0.28), Vector3(0, 0.31, -0.01), hair, false, Vector3(-0.15, 0, 0), head)
-		"cap_back":
-			_box(Vector3(0.28, 0.09, 0.27), Vector3(0, 0.31, 0), _mat(room, look.cap), false, Vector3.ZERO, head)
-			_box(Vector3(0.2, 0.025, 0.12), Vector3(0, 0.28, -0.18), _mat(room, look.cap), false, Vector3.ZERO, head)
-		"flat_cap":
-			_box(Vector3(0.29, 0.07, 0.29), Vector3(0, 0.31, 0.01), _mat(room, look.cap), false, Vector3.ZERO, head)
-			_box(Vector3(0.24, 0.025, 0.1), Vector3(0, 0.285, 0.16), _mat(room, look.cap), false, Vector3.ZERO, head)
-		"horseshoe":
-			_box(Vector3(0.27, 0.09, 0.1), Vector3(0, 0.19, -0.08), hair, false, Vector3.ZERO, head)
-			for side in [-1.0, 1.0]:
-				_box(Vector3(0.03, 0.09, 0.14), Vector3(side * 0.13, 0.19, 0.0), hair, false, Vector3.ZERO, head)
-	if look.get("beard", false):
-		_box(Vector3(0.24, 0.1, 0.04), Vector3(0, 0.04, 0.115), _mat(room, Color(0.7, 0.7, 0.68)), false, Vector3.ZERO, head)
-	if look.get("moustache", false):
-		_box(Vector3(0.12, 0.025, 0.02), Vector3(0, 0.08, 0.13), hair, false, Vector3.ZERO, head)
+	var mat := func(c: Color, pattern: int, c2: Color, texel: float, glow: Color) -> ShaderMaterial:
+		return _mat(room, c, pattern, c2, texel, glow)
+	var parts: Dictionary = office.Puppet.build(office, body, look, mat, "sit" if seated else "stand")
+	var head: Node3D = parts.head
+	var mouth: Node3D = parts.mouth
+	var eyes: Array = parts.eyes
+	office._shadow(root.global_position, Vector2(0.42, 0.34), 0.5, yaw, root)
 	var alert: Label3D = _label("!", Vector3(0, 2.05 - (0.42 if seated else 0.0), 0), 48, Color(1.0, 0.85, 0.3), root)
 	alert.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	alert.visible = false
@@ -607,7 +550,7 @@ const LOOKS := {
 	"bernie": {"skin": Color(0.5, 0.34, 0.25), "shirt": Color(0.55, 0.3, 0.62), "pants": Color(0.2, 0.18, 0.26), "hair": Color(0.15, 0.1, 0.08), "hair_style": "curls", "lanyard": true},
 	"theo": {"skin": Color(0.96, 0.8, 0.68), "shirt": Color(0.12, 0.15, 0.32), "pants": Color(0.35, 0.36, 0.4), "hair": Color(0.85, 0.72, 0.4), "hair_style": "slick", "tie": Color(0.75, 0.12, 0.12)},
 	"ray": {"skin": Color(0.42, 0.28, 0.2), "shirt": Color(0.45, 0.32, 0.2), "pants": Color(0.3, 0.38, 0.46), "strap": Color(0.3, 0.38, 0.46), "hair_style": "flat_cap", "cap": Color(0.3, 0.3, 0.32), "beard": true},
-	"dale": {"skin": Color(0.93, 0.72, 0.58), "shirt": Color(0.86, 0.84, 0.66), "pants": Color(0.22, 0.24, 0.3), "hair": Color(0.36, 0.24, 0.15), "hair_style": "horseshoe", "glasses": true, "moustache": true, "tie": Color(0.62, 0.12, 0.42), "wide": 1.3},
+	"dale": {"skin": Color(0.93, 0.72, 0.58), "shirt": Color(0.7, 0.8, 0.88), "sleeves": "short", "pants": Color(0.22, 0.24, 0.3), "hair": Color(0.36, 0.24, 0.15), "hair_style": "horseshoe", "glasses": true, "moustache": true, "tie": Color(0.62, 0.12, 0.42), "wide": 1.3, "belly": true},
 }
 
 
@@ -745,6 +688,10 @@ func _build_trading() -> void:
 	# Rows of trader desks with glowing green CRTs.
 	var desk := _mat(r, Color(0.3, 0.32, 0.36))
 	var shell := _mat(r, Color(0.75, 0.74, 0.68), 6, Color.BLACK, 40.0)
+	var keys := _mat(r, Color(0.8, 0.79, 0.72), 7, Color(0.45, 0.44, 0.4))
+	var cloth := _mat(r, Color(0.26, 0.34, 0.3), 1, Color(0.22, 0.29, 0.26), 50.0)
+	var frame := _mat(r, Color(0.1, 0.1, 0.11))
+	var steel := _mat(r, Color(0.55, 0.56, 0.58))
 	for x in [-2.6, 2.6]:
 		for i in 3:
 			var zz := z0 + 1.6 + i * 2.1
@@ -754,8 +701,23 @@ func _build_trading() -> void:
 			_box(Vector3(1.3, 0.05, 0.7), Vector3(x, 0.74, zz), desk, true, Vector3.ZERO, p)
 			_box(Vector3(1.26, 0.7, 0.04), Vector3(x, 0.37, zz - 0.32), desk, true, Vector3.ZERO, p)
 			for k in [-0.3, 0.3]:
-				_box(Vector3(0.4, 0.32, 0.32), Vector3(x + k, 0.95, zz + 0.1), shell, false, Vector3.ZERO, p)
-				_box(Vector3(0.32, 0.24, 0.01), Vector3(x + k, 0.96, zz - 0.065), _glow(r, Color(0.1, 0.5, 0.2)), false, Vector3.ZERO, p)
+				# A stubby CRT (bezel, tube, foot), a keyboard, and whatever
+				# that trader left on the desk.
+				_box(Vector3(0.4, 0.32, 0.1), Vector3(x + k, 0.96, zz - 0.01), shell, false, Vector3.ZERO, p)
+				_box(Vector3(0.34, 0.27, 0.16), Vector3(x + k, 0.96, zz + 0.1), shell, false, Vector3.ZERO, p)
+				_box(Vector3(0.24, 0.19, 0.1), Vector3(x + k, 0.965, zz + 0.22), shell, false, Vector3.ZERO, p)
+				_box(Vector3(0.2, 0.03, 0.22), Vector3(x + k, 0.78, zz + 0.08), shell, false, Vector3.ZERO, p)
+				_box(Vector3(0.32, 0.24, 0.01), Vector3(x + k, 0.965, zz - 0.065), _glow(r, Color(0.1, 0.5, 0.2)), false, Vector3.ZERO, p)
+				_box(Vector3(0.3, 0.02, 0.11), Vector3(x + k, 0.776, zz - 0.2), keys, false, Vector3(0.06, k * 0.2, 0), p)
+			var seat := Node3D.new()
+			seat.position = Vector3(x + (0.25 if i % 2 == 0 else -0.2), 0, zz - 0.85)
+			seat.rotation.y = 0.35 - i * 0.4
+			p.add_child(seat)
+			office._chair(seat, cloth, false, 0.5, frame, steel)
+			if i != 1:
+				office._cyl(0.04, 0.1, Vector3(x - 0.02, 0.815, zz - 0.22), _mat(r, Color(0.9, 0.9, 0.86)), Vector3.ZERO, 8, 0.046, p)
+			else:
+				_box(Vector3(0.2, 0.05, 0.27), Vector3(x + 0.02, 0.79, zz - 0.2), _mat(r, Color(0.94, 0.93, 0.86)), false, Vector3(0, 0.3, 0), p)
 	# The terminal you trade on: a tall double-height monitor on its own desk.
 	var term := Node3D.new()
 	term.position = Vector3(-1.2, 0, z0 + 3.4)
@@ -842,8 +804,15 @@ func _build_corner() -> void:
 	_label("FOUNDER", Vector3(0.5, 0.832, 0.398), 8, Color(0.15, 0.1, 0.05), desk, Vector3(-0.3, 0, 0))
 	# The big leather chair (it does not squeak) behind it.
 	var leather := _mat(r, Color(0.15, 0.08, 0.06))
-	_box(Vector3(0.65, 0.1, 0.6), Vector3(0, 0.5, -0.85), leather, true, Vector3.ZERO, desk)
-	_box(Vector3(0.65, 0.9, 0.12), Vector3(0, 1.0, -1.12), leather, false, Vector3.ZERO, desk)
+	_box(Vector3(0.6, 0.1, 0.56), Vector3(0, 0.46, -0.85), leather, true, Vector3.ZERO, desk)
+	office._lump(Vector3(0.7, 0.17, 0.64), Vector3(0, 0.53, -0.85), leather, desk, 0.6)
+	office._lump(Vector3(0.7, 1.0, 0.18), Vector3(0, 1.04, -1.13), leather, desk, 0.6, Vector3(-0.08, 0, 0))
+	office._lump(Vector3(0.5, 0.2, 0.1), Vector3(0, 1.4, -1.06), leather, desk, 0.7, Vector3(-0.08, 0, 0))
+	for side in [-1.0, 1.0]:
+		office._lump(Vector3(0.11, 0.13, 0.5), Vector3(side * 0.37, 0.72, -0.88), leather, desk, 0.7)
+		_box(Vector3(0.05, 0.2, 0.05), Vector3(side * 0.37, 0.6, -0.78), leather, false, Vector3.ZERO, desk)
+	office._cyl(0.05, 0.36, Vector3(0, 0.24, -0.85), _mat(r, Color(0.7, 0.56, 0.26)), Vector3.ZERO, 7, -1.0, desk)
+	office._cyl(0.3, 0.05, Vector3(0, 0.03, -0.85), _mat(r, Color(0.7, 0.56, 0.26)), Vector3.ZERO, 8, 0.1, desk)
 	_monitor(r, desk, Vector3(-0.55, 0.795, -0.05), Vector2(0.24, 0.43), "putt", "res://addons/hh_minigames/golf/putt.gd", Color(0.2, 0.2, 0.22))
 	# The memo: a folded sheet on the blotter, glowing a little so you notice it.
 	_box(Vector3(0.7, 0.01, 0.45), Vector3(0.2, 0.8, 0.1), _mat(r, Color(0.2, 0.3, 0.22)), false, Vector3.ZERO, desk)
@@ -858,6 +827,12 @@ func _build_corner() -> void:
 	# The fabled smoothie machine. Dale was right.
 	_box(Vector3(0.5, 1.5, 0.45), Vector3(-3.15, 0.75, z0 + 1.2), _mat(r, Color(0.9, 0.5, 0.65), 6, Color.BLACK, 30.0), true, Vector3.ZERO, p)
 	_box(Vector3(0.02, 0.4, 0.3), Vector3(-2.89, 1.15, z0 + 1.2), _glow(r, Color(1.0, 0.6, 0.75)), false, Vector3.ZERO, p)
+	var chrome := _mat(r, Color(0.8, 0.8, 0.84))
+	_box(Vector3(0.1, 0.03, 0.34), Vector3(-2.86, 0.86, z0 + 1.2), chrome, false, Vector3.ZERO, p)
+	for k in [-0.09, 0.09]:
+		office._cyl(0.012, 0.06, Vector3(-2.86, 0.99, z0 + 1.2 + k), chrome, Vector3.ZERO, 6, -1.0, p)
+		office._cyl(0.035, 0.1, Vector3(-2.86, 0.925, z0 + 1.2 + k), _mat(r, Color(0.98, 0.72, 0.8) if k < 0 else Color(0.75, 0.9, 0.6)), Vector3.ZERO, 8, 0.042, p)
+	office._cyl(0.045, 0.34, Vector3(-3.05, 1.67, z0 + 1.02), _mat(r, Color(0.96, 0.95, 0.9)), Vector3.ZERO, 8, -1.0, p)
 	_label("SMOOTHIES", Vector3(-2.88, 1.62, z0 + 1.2), 12, Color(1.0, 0.95, 0.9), p, Vector3(0, PI / 2, 0))
 	_label("YOU MADE IT.", Vector3(0, 2.5, z0 + 0.08), 22, Color(0.5, 0.3, 0.15), p)
 	# The final room: the TOP FLOOR elevator in the west wall (LIFTS), and
