@@ -13,8 +13,8 @@ float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
-vec3 bright(sampler2D tex, vec2 uv) {
-	vec3 c = texture(tex, uv).rgb;
+// Only the bright part of a colour feeds the bloom.
+vec3 bright(vec3 c) {
 	float l = max(c.r, max(c.g, c.b));
 	return c * smoothstep(0.78, 1.0, l);
 }
@@ -32,8 +32,8 @@ void fragment() {
 	for (int i = 0; i < 10; i++) {
 		float a = float(i) * 0.6283 + 0.3;
 		vec2 d = vec2(cos(a), sin(a) * aspect);
-		glow += bright(TEXTURE, uv + d * 0.012) * 0.6;
-		glow += bright(TEXTURE, uv + d * 0.03) * 0.4;
+		glow += bright(texture(TEXTURE, uv + d * 0.012).rgb) * 0.6;
+		glow += bright(texture(TEXTURE, uv + d * 0.03).rgb) * 0.4;
 	}
 	col *= 0.9;
 	col += glow / 10.0 * bloom;
