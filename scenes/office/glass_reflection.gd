@@ -85,16 +85,18 @@ func _build_you() -> void:
 	var skin: Material = office._mat(Color(0.6, 0.46, 0.38))
 	var hair: Material = office._mat(Color(0.14, 0.1, 0.08))
 	var shirt: Material = office._mat(MY_SHIRT, 6, Color.BLACK, 40.0)
-	var parts: Array[MeshInstance3D] = [
-		office._box(Vector3(0.19, 0.24, 0.21), Vector3(0, -0.02, 0.06), skin, false, Vector3.ZERO, _you),
-		office._box(Vector3(0.21, 0.07, 0.23), Vector3(0, 0.11, 0.07), hair, false, Vector3.ZERO, _you),
-		office._box(Vector3(0.21, 0.16, 0.06), Vector3(0, 0.03, 0.17), hair, false, Vector3.ZERO, _you),
-		office._box(Vector3(0.1, 0.12, 0.1), Vector3(0, -0.19, 0.08), skin, false, Vector3.ZERO, _you),
-		office._box(Vector3(0.46, 0.4, 0.24), Vector3(0, -0.45, 0.1), shirt, false, Vector3.ZERO, _you),
-	]
-	for p in parts:
-		p.layers = office.LAYER_REFLECT
-		p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# One smooth piece, like everyone else (puppet.gd): head, hair, neck
+	# and shoulders.
+	var sh = office.Puppet.Shape.new()
+	sh.lump(Vector3(0.2, 0.25, 0.22), Vector3(0, -0.02, 0.06), skin, 0.65)
+	sh.lump(Vector3(0.22, 0.09, 0.24), Vector3(0, 0.1, 0.07), hair, 0.7)
+	sh.lump(Vector3(0.22, 0.17, 0.08), Vector3(0, 0.03, 0.16), hair, 0.75)
+	sh.loft([[-0.62, 0.2, 0.12, 0.12, shirt], [-0.36, 0.23, 0.13, 0.13, shirt], [-0.28, 0.18, 0.11, 0.11, shirt],
+		[-0.24, 0.07, 0.06, 0.06, skin], [-0.12, 0.055, 0.05, 0.05, skin]], 12)
+	var mi: MeshInstance3D = sh.commit(office, _you)
+	mi.position.z = 0.09
+	mi.layers = office.LAYER_REFLECT
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 func _glass() -> Vector2:

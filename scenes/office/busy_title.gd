@@ -1,44 +1,108 @@
 extends Control
-## Look Busy's title screen (docs/look-busy.md): shown once each time the
-## office starts with Look Busy on, before you clock in. A looping cartoon
-## (BusyDemo, below), filmed live in the real 3D office, plays the whole loop with no reading needed: you play a
-## game at your desk, the boss walks in, you alt-tab to a spreadsheet and get
-## away with it (or you don't, and get a strike), then your own game ships.
-## Three rule lines say the same in words. Nothing past floor 1 is named, so
-## the bosses upstairs, the ladder and Dale's secret stay to be found.
-## It pauses the office while it's up and runs PROCESS_MODE_ALWAYS. Buttons
-## are 88 px tall: touch, mouse and the pad cursor all work. Enter / Space /
-## A clocks in.
+## Look Busy's title screen (docs/look-busy.md, "Title screen"): shown once
+## each time the office starts with Look Busy on, before you clock in. Made
+## like a 2007 console title:
+##   - Behind everything, the real office at sunset filmed live by a slow
+##     cinematic camera (its own SubViewport on the office's world): it opens
+##     close on the "Golden Hour" picture on the wall (the sunset moves), pulls
+##     back, then cuts through the window with Dale against the sun, a crane
+##     over the room and a dolly past the main desk, with a white-gold dip
+##     between shots, dust in the sunbeam, and title_post.gdshader on top
+##     (bloom, warm grade, light leak, grain, vignette). Letterbox bars.
+##   - ATTRACT: the polished gold logo (title_logo.gdshader, a glint sweeps
+##     through) and PRESS START / TAP TO START. Any press opens the menu.
+##   - MENU: the logo moves up, a glossy slanted highlight bar slides between
+##     CLOCK IN, HOW TO PLAY and OPTIONS (one line under it says what each
+##     does), your records in a card, button prompts along the bottom.
+##   - HOW TO PLAY: a glass panel with the live cartoon (BusyDemo, below)
+##     and the three rules; BACK returns.
+## Nothing past floor 1 is named, so the bosses upstairs, the ladder and
+## Dale's secret stay to be found. It pauses the office while it's up and
+## runs PROCESS_MODE_ALWAYS. Touch, mouse, keys (arrows / Enter / Esc) and
+## the pad (D-pad or stick, A, B, Start) all work; items are 96 px tall.
+## Fonts: Inter (scenes/office/fonts, OFL).
 
 signal clocked_in
 
 const FONT := preload("res://addons/hh_minigames/_shared/fonts/press_start_2p.ttf")
+const LOGO_FONT := preload("res://scenes/office/fonts/InterDisplay-BlackItalic.otf")
+const MENU_FONT := preload("res://scenes/office/fonts/InterDisplay-Bold.otf")
+const BODY_FONT := preload("res://scenes/office/fonts/Inter-SemiBold.otf")
+const POST := preload("res://scenes/office/title_post.gdshader")
+const LOGO_SHADER := preload("res://scenes/office/title_logo.gdshader")
+const CLICK := preload("res://addons/hh_minigames/_shared/audio/click.wav")
+const CHIME := preload("res://addons/hh_minigames/_shared/audio/chime.wav")
 const YELLOW := Color(1.0, 0.86, 0.25)
-const INK := Color(0.08, 0.08, 0.1)
+const GOLD := Color(1.0, 0.72, 0.25)
+const INK := Color(0.08, 0.06, 0.1)
 ## The three rules, with the colour of the HUD bar each one maps to.
 const RULES := [
 	[Color(0.3, 0.85, 0.35), "PLAY GAMES AT WORK", "Every minute fills your SLACK meter. Hit the day's quota."],
 	[Color(0.95, 0.25, 0.2), "DON'T GET CAUGHT", "Boss near? ALT-TAB to a spreadsheet (your game waits). Seen playing = suspicion. 3 strikes = fired."],
 	[Color(1.0, 0.45, 0.8), "SHIP YOUR GAME FRIDAY", "Beat desk games for pieces. Good reviews = promoted a floor."],
 ]
+## Seconds per camera shot, and the white-gold dip across each cut.
+const SHOT_SECS := 8.5
+const DIP := 0.9
+## The shots after the opening one on the picture: [from, look at, to, look
+## at, fov]. Through the window with Dale against the sun; a crane over the
+## room from the door; a dolly past the main desk.
+const SHOTS := [
+	[Vector3(-1.05, 1.5, 1.0), Vector3(-6.5, 1.5, -1.5), Vector3(-1.25, 1.42, -0.3), Vector3(-6.5, 1.45, -1.0), 50.0],
+	[Vector3(2.95, 2.2, 3.55), Vector3(-1.6, 0.75, -1.9), Vector3(2.2, 1.65, 2.45), Vector3(-1.9, 0.9, -1.2), 62.0],
+	[Vector3(1.15, 1.18, -0.95), Vector3(0.0, 1.0, -2.6), Vector3(-0.95, 1.1, -1.05), Vector3(0.05, 1.0, -2.6), 46.0],
+]
+const ITEM_H := 96.0
 
 var office: Node
 var busy: Node
-var _box: BoxContainer
-var _margin: MarginContainer
-var _logo: Label
+## "attract" (logo + PRESS START), "menu", or "how" (the how-to-play page).
+var state := "attract"
+var _go: Button
+var _how: Button
+var _options: Button
+var _items: Array[Button] = []
+var _focus := 0
 var _demo: Control
-var _side: VBoxContainer
-var _rule_texts: Array[Label] = []
 var _records: Label
 var _controls: Label
-var _go: Button
-var _options: Button
-var _cursor: Node
-var _t := 0.0
-var _waiting_menu := false
-## Web only: browsers hold sound until the first tap (office_music.gd).
 var _sound_hint: Label
+var _waiting_menu := false
+var _t := 0.0
+var _k := 0.0
+var _shot := -1
+var _shot_t := 0.0
+var _world_mode := SubViewport.UPDATE_ALWAYS
+var _live := false
+var _stick_wait := 0.0
+
+var _cine: SubViewportContainer
+var _vp: SubViewport
+var _cam: Camera3D
+var _post: ShaderMaterial
+var _dust: CPUParticles3D
+var _bars: Array[ColorRect] = []
+var _halo: TextureRect
+var _shade: TextureRect
+var _logo: Label
+var _logo_mat: ShaderMaterial
+var _tag: Label
+var _press: Label
+var _menu: Control
+var _blade: Blade
+var _hint: Label
+var _card: PanelContainer
+var _card_name: Label
+var _prompts: Label
+var _studio: Label
+var _page: Control
+var _page_panel: PanelContainer
+var _page_box: BoxContainer
+var _side: VBoxContainer
+var _back: Button
+var _rule_texts: Array[Label] = []
+var _tease: Label
+var _sfx: AudioStreamPlayer
 
 
 func _ready() -> void:
@@ -46,94 +110,256 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
-	_margin = MarginContainer.new()
-	_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_margin)
-	_box = BoxContainer.new()
-	_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	_box.add_theme_constant_override("separation", 18)
-	_margin.add_child(_box)
-	var head := VBoxContainer.new()
-	head.add_theme_constant_override("separation", 8)
-	head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.alignment = BoxContainer.ALIGNMENT_CENTER
-	_box.add_child(head)
-	_logo = _label("LOOK BUSY", 56, YELLOW, 14)
-	_logo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	head.add_child(_logo)
-	var tag := _label("A GAME ABOUT PLAYING GAMES AT WORK", 14, Color(1, 1, 1, 0.85), 6)
-	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tag.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	head.add_child(tag)
-	_sound_hint = _label("TAP ANYWHERE FOR MUSIC", 12, YELLOW, 4)
-	_sound_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sfx = AudioStreamPlayer.new()
+	_sfx.bus = "Effects"
+	add_child(_sfx)
+	# The camera picture (filled in by _build_cine once the office exists).
+	_cine = SubViewportContainer.new()
+	_cine.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_cine.stretch = true
+	_cine.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_post = ShaderMaterial.new()
+	_post.shader = POST
+	_post.set_shader_parameter("flash", 0.0)
+	_cine.material = _post
+	add_child(_cine)
+	for i in 2:
+		var bar := ColorRect.new()
+		bar.color = Color(0.0, 0.0, 0.0, 0.92)
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(bar)
+		_bars.append(bar)
+	# The logo, its halo and the tagline.
+	# Shade behind the menu so it reads over the bright room (left sideways,
+	# along the bottom upright).
+	_shade = TextureRect.new()
+	_shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_shade.stretch_mode = TextureRect.STRETCH_SCALE
+	_shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_shade)
+	_halo = TextureRect.new()
+	var grad := Gradient.new()
+	grad.offsets = PackedFloat32Array([0.0, 0.45, 1.0])
+	grad.colors = PackedColorArray([Color(1.0, 0.72, 0.35, 0.55), Color(1.0, 0.5, 0.2, 0.18), Color(1.0, 0.4, 0.15, 0.0)])
+	var halo_tex := GradientTexture2D.new()
+	halo_tex.gradient = grad
+	halo_tex.fill = GradientTexture2D.FILL_RADIAL
+	halo_tex.fill_from = Vector2(0.5, 0.5)
+	halo_tex.fill_to = Vector2(1.0, 0.5)
+	halo_tex.width = 128
+	halo_tex.height = 64
+	_halo.texture = halo_tex
+	_halo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_halo.stretch_mode = TextureRect.STRETCH_SCALE
+	_halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var add_mat := CanvasItemMaterial.new()
+	add_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	_halo.material = add_mat
+	add_child(_halo)
+	_logo = _text("LOOK BUSY", LOGO_FONT, 120, Color.WHITE, 14, Color(0.28, 0.1, 0.02))
+	_logo.add_theme_color_override("font_shadow_color", Color(0.1, 0.02, 0.0, 0.6))
+	_logo.add_theme_constant_override("shadow_offset_x", 0)
+	_logo.add_theme_constant_override("shadow_offset_y", 8)
+	_logo.add_theme_constant_override("shadow_outline_size", 18)
+	_logo_mat = ShaderMaterial.new()
+	_logo_mat.shader = LOGO_SHADER
+	_logo.material = _logo_mat
+	add_child(_logo)
+	var spaced := FontVariation.new()
+	spaced.base_font = BODY_FONT
+	spaced.spacing_glyph = 5
+	_tag = _text("A GAME ABOUT PLAYING GAMES AT WORK", spaced, 20, Color(1, 0.96, 0.88), 6, Color(0.15, 0.05, 0.05, 0.8))
+	add_child(_tag)
+	_press = _text("PRESS START", spaced, 26, Color.WHITE, 8, Color(0.2, 0.08, 0.02, 0.9))
+	add_child(_press)
+	_sound_hint = _text("TAP ANYWHERE FOR MUSIC", BODY_FONT, 16, YELLOW, 5, Color(0, 0, 0, 0.8))
 	_sound_hint.visible = false
-	head.add_child(_sound_hint)
-	_demo = BusyDemo.new()
-	_demo.office = office
-	_demo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(_demo)
-	_side = VBoxContainer.new()
-	_side.add_theme_constant_override("separation", 12)
-	_side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_side.alignment = BoxContainer.ALIGNMENT_CENTER
-	_box.add_child(_side)
-	for i in RULES.size():
-		_side.add_child(_rule(i))
-	var tease := _label("Get promoted, go up a floor. Nobody has seen the top one.", 12, Color(1, 1, 1, 0.6), 4)
-	tease.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tease.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_side.add_child(tease)
-	_records = _label("", 12, YELLOW, 4)
-	_records.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_records.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_side.add_child(_records)
-	_go = _button("CLOCK IN", YELLOW, 26)
-	_go.custom_minimum_size.y = 104
-	_go.pressed.connect(_clock_in)
-	_side.add_child(_go)
-	_controls = _label("", 11, Color(1, 1, 1, 0.7), 4)
-	_controls.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_controls.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_side.add_child(_controls)
-	_options = _button("OPTIONS", Color(0.8, 0.8, 0.78), 16)
-	_options.pressed.connect(_open_options)
-	_side.add_child(_options)
+	add_child(_sound_hint)
+	_studio = _text("HUMBLE HOUSE GAMES", spaced, 14, Color(1, 1, 1, 0.55), 0, Color.BLACK)
+	add_child(_studio)
+	_prompts = _text("", BODY_FONT, 17, Color(1, 1, 1, 0.85), 4, Color(0, 0, 0, 0.6))
+	add_child(_prompts)
+	_build_menu()
+	_build_card()
+	_build_page()
 	get_viewport().size_changed.connect(_layout)
 
 
-func open() -> void:
-	_t = 0.0
+func _build_menu() -> void:
+	_menu = Control.new()
+	_menu.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_menu)
+	_blade = Blade.new()
+	_blade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_menu.add_child(_blade)
+	_go = _item("CLOCK IN", _clock_in)
+	_how = _item("HOW TO PLAY", _open_how)
+	_options = _item("OPTIONS", _open_options)
+	_hint = _text("", BODY_FONT, 19, Color(1, 0.95, 0.85), 5, Color(0, 0, 0, 0.7))
+	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_menu.add_child(_hint)
+
+
+func _item(words: String, act: Callable) -> Button:
+	var b := Button.new()
+	b.text = words
+	b.focus_mode = Control.FOCUS_NONE
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.add_theme_font_override("font", MENU_FONT)
+	b.add_theme_font_size_override("font_size", 44)
+	b.add_theme_constant_override("outline_size", 6)
+	b.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.45))
+	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
+		var e := StyleBoxEmpty.new()
+		e.content_margin_left = 34
+		b.add_theme_stylebox_override(st, e)
+	var i := _items.size()
+	b.pressed.connect(func() -> void:
+		_set_focus(i, false)
+		_play(CHIME, -8.0)
+		act.call())
+	b.mouse_entered.connect(func() -> void:
+		if state == "menu":
+			_set_focus(i))
+	_menu.add_child(b)
+	_items.append(b)
+	return b
+
+
+## Your records, like a profile card in the corner.
+func _build_card() -> void:
+	_card = PanelContainer.new()
+	_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_card.add_theme_stylebox_override("panel", _glass(Color(0.06, 0.04, 0.1, 0.62), Color(1.0, 0.75, 0.35, 0.55), 10))
+	add_child(_card)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	_card.add_child(row)
+	var badge := PanelContainer.new()
+	var bs := StyleBoxFlat.new()
+	bs.bg_color = GOLD
+	bs.set_corner_radius_all(8)
+	bs.border_color = Color(1, 0.95, 0.8)
+	bs.set_border_width_all(2)
+	badge.add_theme_stylebox_override("panel", bs)
+	badge.custom_minimum_size = Vector2(64, 64)
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var star := _text("★", BODY_FONT, 34, INK, 0, Color.BLACK)
+	star.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	star.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	badge.add_child(star)
+	row.add_child(badge)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 2)
+	row.add_child(col)
+	_card_name = _text("NEW HIRE", MENU_FONT, 22, GOLD, 0, Color.BLACK)
+	col.add_child(_card_name)
+	_records = _text("", BODY_FONT, 16, Color(1, 1, 1, 0.9), 0, Color.BLACK)
+	col.add_child(_records)
+
+
+## HOW TO PLAY: the cartoon and the three rules on a glass panel.
+func _build_page() -> void:
+	_page = Control.new()
+	_page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_page.mouse_filter = Control.MOUSE_FILTER_STOP
+	_page.visible = false
+	add_child(_page)
+	var dim := ColorRect.new()
+	dim.color = Color(0.03, 0.02, 0.06, 0.55)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_page.add_child(dim)
+	_page_panel = PanelContainer.new()
+	_page_panel.add_theme_stylebox_override("panel", _glass(Color(0.05, 0.04, 0.09, 0.86), Color(1.0, 0.75, 0.35, 0.7), 14))
+	_page.add_child(_page_panel)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 14)
+	_page_panel.add_child(col)
+	var head := _text("HOW TO PLAY", MENU_FONT, 34, GOLD, 6, Color(0, 0, 0, 0.6))
+	col.add_child(head)
+	_page_box = BoxContainer.new()
+	_page_box.add_theme_constant_override("separation", 20)
+	_page_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col.add_child(_page_box)
+	_demo = BusyDemo.new()
 	_demo.office = office
-	_demo.reset()
-	_demo.go_live(true)
+	_demo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_demo.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_page_box.add_child(_demo)
+	_side = VBoxContainer.new()
+	_side.add_theme_constant_override("separation", 14)
+	_side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_side.alignment = BoxContainer.ALIGNMENT_CENTER
+	_page_box.add_child(_side)
+	for i in RULES.size():
+		_side.add_child(_rule(i))
+	_tease = _text("Get promoted, go up a floor. Nobody has seen the top one.", BODY_FONT, 16, Color(1, 1, 1, 0.65), 0, Color.BLACK)
+	_tease.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_side.add_child(_tease)
+	_controls = _text("", BODY_FONT, 15, Color(1, 0.9, 0.7, 0.85), 0, Color.BLACK)
+	_controls.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_side.add_child(_controls)
+	_back = Button.new()
+	_back.text = "BACK"
+	_back.focus_mode = Control.FOCUS_NONE
+	_back.custom_minimum_size = Vector2(220, 88)
+	_back.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_back.add_theme_font_override("font", MENU_FONT)
+	_back.add_theme_font_size_override("font_size", 28)
+	for st in ["font_color", "font_hover_color", "font_pressed_color"]:
+		_back.add_theme_color_override(st, INK)
+	_back.add_theme_stylebox_override("normal", _glass(GOLD, Color(1, 0.95, 0.8), 10))
+	_back.add_theme_stylebox_override("hover", _glass(GOLD.lightened(0.15), Color(1, 0.95, 0.8), 10))
+	_back.add_theme_stylebox_override("pressed", _glass(GOLD.darkened(0.2), Color(1, 0.95, 0.8), 10))
+	_back.pressed.connect(_close_how)
+	col.add_child(_back)
+
+
+func open() -> void:
+	_build_cine()
 	_refresh()
 	visible = true
 	get_tree().paused = true
 	if office:
 		office.release_for_overlay()
+	_go_live(true)
+	if state == "how":
+		_page.visible = true
+		_demo.go_live(true)
+		_pause_cine(true)
 	_layout()
-	if _cursor == null:
-		_cursor = preload("res://addons/hh_minigames/_shared/pad_cursor.gd").new()
-		add_child(_cursor)
-	_cursor.focus.call_deferred(_go)
-	_cursor.active = office != null and office._pad
 
 
 func close() -> void:
 	visible = false
+	_page.visible = false
+	if state == "how":
+		state = "menu"
 	_demo.go_live(false)
+	_go_live(false)
 	_waiting_menu = false
-	if _cursor:
-		_cursor.queue_free()
-		_cursor = null
 	get_tree().paused = false
 
 
 func _clock_in() -> void:
 	close()
+	_flash_out()
 	clocked_in.emit()
+
+
+## A white-gold flash over the office as you clock in, fading on its own.
+func _flash_out() -> void:
+	if get_parent() == null:
+		return
+	var f := ColorRect.new()
+	f.color = Color(1.0, 0.9, 0.72, 0.85)
+	f.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	f.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	get_parent().add_child(f)
+	var tw := f.create_tween()
+	tw.tween_property(f, "color:a", 0.0, 0.7).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(f.queue_free)
 
 
 ## OPTIONS: the office's pause menu; back here when it closes.
@@ -141,10 +367,42 @@ func _open_options() -> void:
 	if office == null:
 		return
 	visible = false
-	_demo.go_live(false)
+	_go_live(false)
 	get_tree().paused = false
 	_waiting_menu = true
 	office._open_menu(office._pad)
+
+
+func _open_how() -> void:
+	state = "how"
+	_demo.office = office
+	_demo.reset()
+	_page.visible = true
+	_page.modulate.a = 0.0
+	create_tween().tween_property(_page, "modulate:a", 1.0, 0.25)
+	_demo.go_live(true)
+	_pause_cine(true)
+	_layout()
+
+
+func _close_how() -> void:
+	if state != "how":
+		return
+	_play(CLICK, -6.0)
+	_demo.go_live(false)
+	_pause_cine(false)
+	_page.visible = false
+	state = "menu"
+	_set_focus(1, false)
+
+
+func _to_menu() -> void:
+	if state != "attract":
+		return
+	state = "menu"
+	_play(CHIME, -6.0)
+	_post.set_shader_parameter("flash", 0.6)
+	_set_focus(0, false)
 
 
 func _process(delta: float) -> void:
@@ -158,27 +416,251 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	_t += delta
+	_stick_wait = maxf(0.0, _stick_wait - delta)
+	_k = move_toward(_k, 0.0 if state == "attract" else 1.0, delta / 0.55)
+	_tick_camera(delta)
+	_place()
 	var music: Node = office.get("_hub_music") if office else null
-	_sound_hint.visible = OS.has_feature("web") and music != null and not music.started
-	if _sound_hint.visible:
-		_sound_hint.modulate.a = 0.55 + 0.45 * sin(_t * 4.0)
-	# The logo breathes a little; the button pulses so the first tap is obvious.
+	_sound_hint.visible = OS.has_feature("web") and music != null and not music.started and state == "attract"
+	# The logo eases in, then breathes; the glint crosses every few seconds.
+	var reveal := clampf((_t - 0.5) / 1.2, 0.0, 1.0)
+	reveal = 1.0 - pow(1.0 - reveal, 3.0)
+	_logo.modulate.a = reveal
+	_tag.modulate.a = clampf((_t - 1.3) / 0.8, 0.0, 1.0)
+	_halo.modulate.a = reveal * (0.75 + 0.25 * sin(_t * 1.4))
+	var sweep := fmod(_t - 1.2, 4.5) / 1.1
+	_logo_mat.set_shader_parameter("glint", lerpf(-0.3, 1.3, sweep) if sweep >= 0.0 and sweep <= 1.0 else -1.0)
 	_logo.pivot_offset = _logo.size * 0.5
-	_logo.rotation = sin(_t * 1.3) * 0.025
-	_go.pivot_offset = _go.size * 0.5
-	var s := 1.0 + 0.03 * maxf(0.0, sin(_t * 4.0))
-	_go.scale = Vector2(s, s)
+	var s := lerpf(1.18, 1.0, reveal) * (1.0 + sin(_t * 1.1) * 0.008)
+	_logo.scale = Vector2(s, s) * lerpf(1.0, _menu_scale(), _k)
+	_press.modulate.a = clampf((_t - 2.0) / 0.6, 0.0, 1.0) * (0.55 + 0.45 * sin(_t * 3.2)) * (1.0 - _k)
+	_menu.modulate.a = _k
+	_shade.modulate.a = _k
+	_menu.visible = _k > 0.0
+	_card.modulate.a = _k
+	_card.visible = _k > 0.0
+	_blade.tick(delta)
+	var fl: float = _post.get_shader_parameter("flash")
+	_post.set_shader_parameter("flash", move_toward(fl, _dip(), delta * 2.5) if fl > _dip() else _dip())
+	_prompts.text = _prompt_text()
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if not visible:
+## The pad, the arrows, Enter and Esc. Taps and clicks go through the buttons.
+func _input(event: InputEvent) -> void:
+	if not visible or _waiting_menu:
 		return
-	var go := false
+	var dir := 0
+	var ok := false
+	var back := false
 	if event is InputEventKey and event.pressed and not event.echo:
-		go = event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]
-	if go:
-		get_viewport().set_input_as_handled()
-		_clock_in()
+		match event.physical_keycode:
+			KEY_UP, KEY_W:
+				dir = -1
+			KEY_DOWN, KEY_S:
+				dir = 1
+			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
+				ok = true
+			KEY_ESCAPE, KEY_BACKSPACE:
+				back = true
+			_:
+				ok = state == "attract"
+	elif event is InputEventJoypadButton and event.pressed:
+		if office:
+			office._pad = true
+		match event.button_index:
+			JOY_BUTTON_DPAD_UP:
+				dir = -1
+			JOY_BUTTON_DPAD_DOWN:
+				dir = 1
+			JOY_BUTTON_A, JOY_BUTTON_START:
+				ok = true
+			JOY_BUTTON_B, JOY_BUTTON_BACK:
+				back = true
+	elif event is InputEventJoypadMotion and event.axis == JOY_AXIS_LEFT_Y:
+		if absf(event.axis_value) > 0.6 and _stick_wait <= 0.0:
+			dir = signi(int(signf(event.axis_value)))
+			_stick_wait = 0.28
+		elif absf(event.axis_value) < 0.3:
+			_stick_wait = 0.0
+	if dir == 0 and not ok and not back:
+		return
+	get_viewport().set_input_as_handled()
+	match state:
+		"attract":
+			if ok:
+				_to_menu()
+		"menu":
+			if dir != 0:
+				_set_focus(wrapi(_focus + dir, 0, _items.size()))
+			elif ok:
+				_items[_focus].pressed.emit()
+		"how":
+			if ok or back:
+				_close_how()
+
+
+func _gui_input(event: InputEvent) -> void:
+	# In attract mode a tap or click anywhere opens the menu.
+	if state == "attract" and visible and ((event is InputEventMouseButton and event.pressed) or (event is InputEventScreenTouch and event.pressed)):
+		accept_event()
+		_to_menu()
+
+
+func _set_focus(i: int, sound := true) -> void:
+	if sound and i != _focus:
+		_play(CLICK, -10.0)
+	_focus = i
+	for k in _items.size():
+		var on := k == _focus
+		var c := INK if on else Color(1, 1, 1, 0.92)
+		for st in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+			_items[k].add_theme_color_override(st, c)
+		_items[k].add_theme_color_override("font_outline_color", Color(1, 0.95, 0.8, 0.0) if on else Color(0, 0, 0, 0.45))
+	_hint.text = _hint_for(i)
+
+
+func _hint_for(i: int) -> String:
+	match i:
+		0:
+			if _go.text == "CLOCK IN":
+				return "Monday, 9:00 AM. Play games at work. Don't get caught."
+			var wd: Workday = busy.wd if busy else null
+			return "Pick up where you left off: %s, floor %d." % [BusyLines.DAYS[clampi(wd.day, 0, 4)].capitalize(), wd.floor_i] if wd else "Pick up where you left off."
+		1:
+			return "Three rules and a cartoon. Thirty seconds."
+		_:
+			return "Volume, look speed, screens and controls."
+
+
+func _prompt_text() -> String:
+	var pad: bool = office != null and office._pad
+	var touch: bool = office != null and (office._touch or DisplayServer.is_touchscreen_available()) and not pad
+	match state:
+		"attract":
+			return ""
+		"how":
+			return "B  BACK" if pad else ("" if touch else "ESC  BACK")
+		_:
+			if pad:
+				return "A  SELECT      ↑↓  MOVE"
+			return "" if touch else "↑↓  MOVE      ENTER  SELECT"
+
+
+## The camera: the opening shot on the picture, then the others in turn.
+func _tick_camera(delta: float) -> void:
+	if _cam == null or not _live or state == "how":
+		return
+	_shot_t += delta
+	if _shot < 0 or _shot_t >= SHOT_SECS:
+		_shot = (_shot + 1) % (SHOTS.size() + 1) if _shot >= 0 else 0
+		_shot_t = 0.0
+	var k := smoothstep(0.0, 1.0, _shot_t / SHOT_SECS)
+	var spec := _shot_spec(_shot)
+	var from: Vector3 = spec[0]
+	var to: Vector3 = spec[2]
+	var at: Vector3 = (spec[1] as Vector3).lerp(spec[3], k)
+	var pos := from.lerp(to, k) + Vector3(sin(_t * 0.37), sin(_t * 0.53) * 0.6, 0.0) * 0.012
+	_cam.fov = spec[4]
+	_cam.look_at_from_position(pos, at)
+
+
+## Shot i: 0 = the picture (framed to fill the screen, then pulling back).
+func _shot_spec(i: int) -> Array:
+	if i > 0:
+		return SHOTS[i - 1]
+	var at: Vector3 = office.SUNSET_PICTURE if office else Vector3.ZERO
+	var canvas: Vector2 = office.SUNSET_CANVAS if office else Vector2.ONE
+	var view := size if size.x > 0.0 else Vector2(1280, 720)
+	var fov := 42.0
+	var tv := tan(deg_to_rad(fov) * 0.5)
+	var fill := maxf(canvas.y * 0.5 / tv, canvas.x * 0.5 / (tv * view.x / view.y)) * 0.88
+	return [at + Vector3(0.02, 0.0, -fill), at, at + Vector3(-0.18, -0.06, -fill * 2.6 - 0.3), at + Vector3(-0.1, -0.08, 0), fov]
+
+
+## The white-gold dip around each cut.
+func _dip() -> float:
+	if _shot < 0:
+		return 0.0
+	var to_end := SHOT_SECS - _shot_t
+	var since := _shot_t
+	var d := 0.0
+	if to_end < DIP * 0.5:
+		d = 1.0 - to_end / (DIP * 0.5)
+	elif since < DIP * 0.5:
+		d = 1.0 - since / (DIP * 0.5)
+	return smoothstep(0.0, 1.0, d) * 0.85 if _t > 1.0 or _shot > 0 else 0.0
+
+
+func _build_cine() -> bool:
+	if _vp:
+		return true
+	if office == null or office._world_vp == null:
+		return false
+	_vp = SubViewport.new()
+	_vp.world_3d = office._world_vp.world_3d
+	_vp.gui_disable_input = true
+	_vp.audio_listener_enable_3d = false
+	_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	_cine.add_child(_vp)
+	_cam = Camera3D.new()
+	_cam.cull_mask = office.LAYER_WORLD
+	_cam.near = 0.04
+	_cam.far = 40.0
+	_cam.current = true
+	_vp.add_child(_cam)
+	# Dust turning in the sunbeam.
+	_dust = CPUParticles3D.new()
+	_dust.process_mode = Node.PROCESS_MODE_ALWAYS
+	_dust.amount = 70
+	_dust.lifetime = 7.0
+	_dust.preprocess = 7.0
+	_dust.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	_dust.emission_box_extents = Vector3(1.3, 0.7, 1.2)
+	_dust.position = Vector3(-2.2, 1.35, -0.5)
+	_dust.direction = Vector3(0.3, 0.2, 0.1)
+	_dust.spread = 180.0
+	_dust.gravity = Vector3(0, -0.01, 0)
+	_dust.initial_velocity_min = 0.01
+	_dust.initial_velocity_max = 0.05
+	_dust.scale_amount_min = 0.5
+	_dust.scale_amount_max = 1.2
+	var mote := QuadMesh.new()
+	mote.size = Vector2(0.01, 0.01)
+	var mm := StandardMaterial3D.new()
+	mm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	mm.albedo_color = Color(1.0, 0.88, 0.6, 0.75)
+	mote.material = mm
+	_dust.mesh = mote
+	_dust.layers = office.LAYER_WORLD
+	_dust.emitting = false
+	_dust.visible = false
+	_vp.add_child(_dust)
+	return true
+
+
+## Start (or stop) filming the office. The office's own view is hidden under
+## the title, so it stops drawing while this one runs.
+func _go_live(on: bool) -> void:
+	if on == _live or _vp == null:
+		return
+	_live = on
+	_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS if on else SubViewport.UPDATE_DISABLED
+	_dust.emitting = on
+	_dust.visible = on
+	var wv: SubViewport = office._world_vp
+	if on:
+		_world_mode = wv.render_target_update_mode
+		wv.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	else:
+		wv.render_target_update_mode = _world_mode
+
+
+## Freeze the camera picture under the how-to page (the cartoon films instead).
+func _pause_cine(on: bool) -> void:
+	if _vp and _live:
+		_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED if on else SubViewport.UPDATE_ALWAYS
 
 
 ## Records, the button's words and the controls line for this run and device.
@@ -187,128 +669,257 @@ func _refresh() -> void:
 		return
 	var wd: Workday = busy.wd
 	var fresh: bool = wd.runs <= 1 and wd.week <= 1 and wd.day == 0 and wd.minutes <= 0.0
-	_go.text = "CLOCK IN" if fresh else "CLOCK BACK IN\n%s, FLOOR %d" % [BusyLines.DAYS[clampi(wd.day, 0, 4)], wd.floor_i]
-	_go.add_theme_font_size_override("font_size", 26 if fresh else 18)
+	_go.text = "CLOCK IN" if fresh else "CLOCK BACK IN"
 	var rec: Array[String] = []
-	if wd.best_slack > Workday.MORNING_COFFEE:
-		rec.append("BEST DAY: %s SLACKED" % Workday.hours_text(wd.best_slack))
-	if wd.best_floor > 1:
-		rec.append("BEST FLOOR: %d" % wd.best_floor)
 	if office and office._ladder:
 		var st: LadderState = office._ladder.state
 		var tot := DeskGoals.total(DaleStory.read_stats(), st.best, Array(st.beaten))
 		if tot.x > 0:
-			rec.append("DESK STARS: %d/%d ★" % [tot.x, tot.y])
+			rec.append("DESK STARS  %d/%d ★" % [tot.x, tot.y])
+	if wd.best_slack > Workday.MORNING_COFFEE:
+		rec.append("BEST DAY  %s slacked" % Workday.hours_text(wd.best_slack))
+	if wd.best_floor > 1:
+		rec.append("BEST FLOOR  %d" % wd.best_floor)
 	if wd.runs > 1:
-		rec.append("FIRED %d TIME%s" % [wd.runs - 1, "" if wd.runs == 2 else "S"])
-	_records.text = "  ".join(rec)
-	_records.visible = not rec.is_empty()
+		rec.append("FIRED  %d time%s" % [wd.runs - 1, "" if wd.runs == 2 else "s"])
+	_card_name.text = "NEW HIRE" if fresh and rec.is_empty() else "EMPLOYEE FILE"
+	_records.text = "\n".join(rec) if not rec.is_empty() else "First day on the job."
 	var pad: bool = office != null and office._pad
 	var touch: bool = office != null and (office._touch or DisplayServer.is_touchscreen_available()) and not pad
 	if pad:
-		_controls.text = "STICKS: WALK + LOOK.  A: SIT AT A SCREEN.  Y: ALT-TAB."
+		_controls.text = "STICKS: walk + look.  A: sit at a screen.  Y: alt-tab."
+		_press.text = "PRESS START"
 	elif touch:
-		_controls.text = "STICK: WALK.  TAP A SCREEN TO SIT.  ALT-TAB: TOP RIGHT."
+		_controls.text = "Stick: walk.  Tap a screen to sit.  Alt-tab: top right."
+		_press.text = "TAP TO START"
 	else:
-		_controls.text = "WASD + MOUSE: WALK.  CLICK A SCREEN TO SIT.  TAB: ALT-TAB."
+		_controls.text = "WASD + mouse: walk.  Click a screen to sit.  Tab: alt-tab."
+		_press.text = "PRESS ENTER"
+	_set_focus(_focus, false)
 
 
+func _wide() -> bool:
+	var v := get_viewport_rect().size
+	return v.x > v.y
+
+
+func _menu_scale() -> float:
+	return 0.58 if _wide() else 0.72
+
+
+## Sizes that only change with the screen.
 func _layout() -> void:
 	var view := get_viewport_rect().size
 	var wide := view.x > view.y
 	var inset: Vector4 = office._inset if office else Vector4.ZERO
-	_margin.add_theme_constant_override("margin_left", int(24 + inset.x))
-	_margin.add_theme_constant_override("margin_top", int(20 + inset.y))
-	_margin.add_theme_constant_override("margin_right", int(24 + inset.z))
-	_margin.add_theme_constant_override("margin_bottom", int(20 + inset.w))
-	_box.vertical = not wide
-	_logo.add_theme_font_size_override("font_size", 48 if wide else 56)
-	_demo.custom_minimum_size = Vector2(0, 300 if wide else 380)
-	_side.custom_minimum_size.x = 520 if wide else 0
-	var body := 12 if wide else 13
+	_logo.add_theme_font_size_override("font_size", 128 if wide else 104)
+	_logo.size = _logo.get_minimum_size()
+	_logo_mat.set_shader_parameter("height", _logo.size.y)
+	_logo_mat.set_shader_parameter("width", _logo.size.x)
+	_tag.add_theme_font_size_override("font_size", 20 if wide else 17)
+	_tag.size = _tag.get_minimum_size()
+	var mw := clampf(view.x * (0.42 if wide else 0.86), 420.0, 620.0)
+	for b in _items:
+		b.size = Vector2(mw, ITEM_H)
+		b.add_theme_font_size_override("font_size", 44 if wide else 42)
+	_hint.size = Vector2(mw, 0)
+	_hint.custom_minimum_size.x = mw
+	_card.reset_size()
+	var sg := Gradient.new()
+	sg.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
+	sg.colors = PackedColorArray([Color(0.04, 0.02, 0.06, 0.72), Color(0.04, 0.02, 0.06, 0.4), Color(0.04, 0.02, 0.06, 0.0)])
+	var st := GradientTexture2D.new()
+	st.gradient = sg
+	st.width = 64
+	st.height = 64
+	st.fill_from = Vector2(0, 0) if wide else Vector2(0, 1)
+	st.fill_to = Vector2(1, 0) if wide else Vector2(0, 0)
+	_shade.texture = st
+	_shade.position = Vector2.ZERO if wide else Vector2(0, view.y * 0.42)
+	_shade.size = Vector2(view.x * 0.62, view.y) if wide else Vector2(view.x, view.y * 0.58)
+	# The how-to page: side by side sideways, stacked upright.
+	_page_box.vertical = not wide
+	_page_panel.position = Vector2(24.0 + inset.x, 24.0 + inset.y)
+	var room := view - _page_panel.position - Vector2(24.0 + inset.z, 24.0 + inset.w)
+	# Wrapped text needs a width to know its height.
+	var side_w := room.x * 0.4 if wide else room.x - 40.0
+	_side.custom_minimum_size.x = side_w
 	for l in _rule_texts:
-		l.add_theme_font_size_override("font_size", body)
+		l.custom_minimum_size.x = side_w - 64.0
+	for l in [_tease, _controls]:
+		l.custom_minimum_size.x = side_w
+	_demo.custom_minimum_size = Vector2(room.x * 0.5, room.y - 200.0) if wide else Vector2(0, 330)
+	_page_panel.reset_size()
+	_page_panel.size = room
+	for l in _rule_texts:
+		l.add_theme_font_size_override("font_size", 16 if wide else 17)
+	_place()
 
 
-func _draw() -> void:
-	# A dark office-blue backdrop with faint scanlines, over the dimmed world.
-	var r := get_rect()
-	draw_rect(Rect2(Vector2.ZERO, r.size), Color(0.03, 0.04, 0.12, 0.96))
-	var y := 0.0
-	while y < r.size.y:
-		draw_rect(Rect2(0, y, r.size.x, 1), Color(1, 1, 1, 0.025))
-		y += 4.0
+## Everything that moves between the attract screen and the menu (_k 0..1).
+func _place() -> void:
+	var view := get_viewport_rect().size
+	var wide := view.x > view.y
+	var inset: Vector4 = office._inset if office else Vector4.ZERO
+	var k := smoothstep(0.0, 1.0, _k)
+	# Letterbox: deep for the attract loop, thinner with the menu up.
+	var bar_h := lerpf(view.y * (0.1 if wide else 0.07), view.y * (0.065 if wide else 0.05), k)
+	_bars[0].position = Vector2.ZERO
+	_bars[0].size = Vector2(view.x, bar_h + inset.y * 0.5)
+	_bars[1].position = Vector2(0, view.y - bar_h - inset.w * 0.5)
+	_bars[1].size = Vector2(view.x, bar_h + inset.w * 0.5)
+	# The logo: centred, then up and to the left (top centre upright).
+	var left_edge := view.x * 0.07 + inset.x
+	var a := Vector2(view.x * 0.5, view.y * (0.4 if wide else 0.33))
+	var b := Vector2(left_edge + _logo.size.x * _menu_scale() * 0.5, view.y * 0.22) if wide else Vector2(view.x * 0.5, view.y * 0.15 + inset.y)
+	var c := a.lerp(b, k)
+	_logo.position = c - _logo.size * 0.5
+	_halo.size = Vector2(_logo.size.x * 1.7, _logo.size.y * 2.4) * _logo.scale.x
+	_halo.position = c - _halo.size * 0.5
+	# The tagline under it, shrinking with it (lined up on the left sideways).
+	var ts := lerpf(1.0, 0.78, k)
+	_tag.scale = Vector2(ts, ts)
+	var tag_y := c.y + _logo.size.y * 0.42 * _logo.scale.y
+	var tag_x := c.x - _tag.size.x * ts * 0.5
+	if wide:
+		tag_x = lerpf(tag_x, left_edge + 14.0, k)
+	_tag.position = Vector2(tag_x, tag_y)
+	_press.size = _press.get_minimum_size()
+	_press.position = Vector2(view.x * 0.5 - _press.size.x * 0.5, view.y * (0.74 if wide else 0.72))
+	_sound_hint.size = _sound_hint.get_minimum_size()
+	_sound_hint.position = Vector2(view.x * 0.5 - _sound_hint.size.x * 0.5, _press.position.y + 52)
+	# The menu slides in from the left.
+	var mw: float = _items[0].size.x
+	var top := view.y * 0.44 if wide else view.y * 0.6
+	var left := view.x * 0.07 + inset.x
+	if not wide:
+		left = (view.x - mw) * 0.5
+	var slide := (1.0 - k) * -80.0
+	for i in _items.size():
+		_items[i].position = Vector2(left + slide * (1.0 + i * 0.4), top + i * (ITEM_H + 6.0))
+	_blade.target = Rect2(_items[_focus].position, _items[_focus].size)
+	_hint.position = Vector2(left + 34.0 + slide, top + _items.size() * (ITEM_H + 6.0) + 10.0)
+	_hint.size.x = mw - 34.0
+	# The records card: top right sideways, under the tagline upright.
+	_card.reset_size()
+	if wide:
+		_card.position = Vector2(view.x - _card.size.x - view.x * 0.05 - inset.z, bar_h + 26.0 + inset.y * 0.5)
+	else:
+		_card.position = Vector2((view.x - _card.size.x) * 0.5, tag_y + 56.0)
+	_studio.size = _studio.get_minimum_size()
+	_studio.position = Vector2(view.x * 0.05 + inset.x, view.y - bar_h * 0.5 - _studio.size.y * 0.5 - inset.w * 0.5)
+	_prompts.size = _prompts.get_minimum_size()
+	_prompts.position = Vector2(view.x - _prompts.size.x - view.x * 0.05 - inset.z, view.y - bar_h * 0.5 - _prompts.size.y * 0.5 - inset.w * 0.5)
+	_studio.visible = wide or _prompts.text == ""
 
 
 func _rule(i: int) -> Control:
 	var spec: Array = RULES[i]
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
+	row.add_theme_constant_override("separation", 14)
 	var chip := PanelContainer.new()
 	var st := StyleBoxFlat.new()
 	st.bg_color = spec[0]
-	st.set_corner_radius_all(4)
+	st.set_corner_radius_all(24)
 	chip.add_theme_stylebox_override("panel", st)
 	chip.custom_minimum_size = Vector2(48, 48)
 	chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var n := _label(str(i + 1), 22, INK, 0)
+	var n := _text(str(i + 1), MENU_FONT, 26, INK, 0, Color.BLACK)
 	n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	n.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	chip.add_child(n)
 	row.add_child(chip)
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 4)
+	col.add_theme_constant_override("separation", 2)
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var h := _label(spec[1], 16, spec[0], 6)
-	col.add_child(h)
-	var t := _label(spec[2], 13, Color(1, 1, 1, 0.9), 4)
+	col.add_child(_text(spec[1], MENU_FONT, 22, spec[0], 0, Color.BLACK))
+	var t := _text(spec[2], BODY_FONT, 16, Color(1, 1, 1, 0.9), 0, Color.BLACK)
 	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	t.add_theme_constant_override("line_spacing", 4)
 	col.add_child(t)
 	_rule_texts.append(t)
 	row.add_child(col)
 	return row
 
 
-func _label(text: String, size: int, color: Color, outline: int) -> Label:
+func _text(words: String, font: Font, size: int, color: Color, outline: int, outline_color: Color) -> Label:
 	var l := Label.new()
-	l.text = text
-	l.add_theme_font_override("font", FONT)
+	l.text = words
+	l.add_theme_font_override("font", font)
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	if outline > 0:
-		l.add_theme_color_override("font_outline_color", Color.BLACK)
+		l.add_theme_color_override("font_outline_color", outline_color)
 		l.add_theme_constant_override("outline_size", outline)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
 
 
-func _button(text: String, fill: Color, size: int) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(0, 88)
-	b.add_theme_font_override("font", FONT)
-	b.add_theme_font_size_override("font_size", size)
-	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		b.add_theme_color_override(state, INK)
-	b.add_theme_stylebox_override("normal", _style(fill, Color(0.98, 0.98, 0.96)))
-	b.add_theme_stylebox_override("hover", _style(fill.lightened(0.15), Color(0.98, 0.98, 0.96)))
-	b.add_theme_stylebox_override("pressed", _style(fill.darkened(0.25), Color(0.3, 0.3, 0.3)))
-	return b
-
-
-func _style(fill: Color, rim: Color) -> StyleBoxFlat:
+## Dark glass with a thin bright rim and a soft drop shadow.
+func _glass(fill: Color, rim: Color, radius: int) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
 	s.bg_color = fill
 	s.border_color = rim
-	s.set_border_width_all(4)
-	s.shadow_color = Color(0, 0, 0, 0.5)
-	s.shadow_offset = Vector2(4, 4)
-	s.shadow_size = 1
-	s.content_margin_top = 8
-	s.content_margin_bottom = 8
+	s.set_border_width_all(2)
+	s.set_corner_radius_all(radius)
+	s.shadow_color = Color(0, 0, 0, 0.4)
+	s.shadow_size = 12
+	s.content_margin_left = 18
+	s.content_margin_right = 18
+	s.content_margin_top = 14
+	s.content_margin_bottom = 14
 	return s
+
+
+func _play(stream: AudioStream, db: float) -> void:
+	_sfx.stream = stream
+	_sfx.volume_db = db
+	_sfx.play()
+
+
+## The highlight behind the chosen menu item: a slanted bar of polished
+## gold (bright sheen on top, deeper underneath) with a soft glow round it,
+## gliding to whichever item you're on; a glint runs along it now and then.
+class Blade:
+	extends Control
+
+	var target := Rect2()
+	var _at := Rect2()
+	var _t := 0.0
+
+	func tick(delta: float) -> void:
+		_t += delta
+		if _at.size == Vector2.ZERO:
+			_at = target
+		var k := minf(1.0, delta * 14.0)
+		_at = Rect2(_at.position.lerp(target.position, k), _at.size.lerp(target.size, k))
+		queue_redraw()
+
+	func _draw() -> void:
+		if _at.size == Vector2.ZERO:
+			return
+		var r := _at.grow_individual(0, -6, 0, -6)
+		var slant := r.size.y * 0.35
+		var p := r.position
+		var w := r.size.x
+		var h := r.size.y
+		# Glow.
+		for g in [[14.0, 0.1], [7.0, 0.18]]:
+			var e: float = g[0]
+			draw_colored_polygon(PackedVector2Array([p + Vector2(slant - e, -e), p + Vector2(w + e, -e), p + Vector2(w - slant + e, h + e), p + Vector2(-e, h + e)]),
+				Color(1.0, 0.6, 0.2, g[1]))
+		# The bar: top light, bottom deep, a hard sheen across the upper half.
+		var pts := PackedVector2Array([p + Vector2(slant, 0), p + Vector2(w, 0), p + Vector2(w - slant, h), p + Vector2(0, h)])
+		draw_polygon(pts, PackedColorArray([Color(1.0, 0.93, 0.66), Color(1.0, 0.86, 0.5), Color(0.96, 0.52, 0.12), Color(0.98, 0.6, 0.16)]))
+		var mid := h * 0.48
+		draw_polygon(PackedVector2Array([p + Vector2(slant, 0), p + Vector2(w, 0), p + Vector2(w - slant * mid / h, mid), p + Vector2(slant - slant * mid / h, mid)]),
+			PackedColorArray([Color(1, 1, 1, 0.45), Color(1, 1, 1, 0.3), Color(1, 1, 1, 0.08), Color(1, 1, 1, 0.12)]))
+		draw_polyline(PackedVector2Array([p + Vector2(slant, 0), p + Vector2(w, 0)]), Color(1, 1, 0.95, 0.9), 2.0)
+		# The glint.
+		var gx := fmod(_t * 0.6, 2.4) / 1.4
+		var x := lerpf(slant, w - slant - 26.0, gx)
+		if gx <= 1.0:
+			draw_colored_polygon(PackedVector2Array([p + Vector2(x + slant, 0), p + Vector2(x + slant + 26, 0), p + Vector2(x + 26, h), p + Vector2(x, h)]),
+				Color(1, 1, 1, 0.35))
 
 
 ## The cartoon, shot live in the real office: a camera up in the corner by

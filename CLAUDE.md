@@ -82,9 +82,14 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   (screens, stickers, glowing panels). Solid furniture gets a painted floor
   shadow by itself (`_ground` / `_shadow`); ps1.gdshader darkens everything
   toward the floor. **People** are puppets from `scenes/office/puppet.gd`
-  (Dale, coworkers, bosses, the board, the title screen's you: `look`
-  dictionaries as before, plus `belly`, `sleeves`, `brows`, `collar`);
-  seated ones sink by `Puppet.SIT_DROP` onto `_chair()`. Props to reuse:
+  (Dale, coworkers, bosses, the board, the title screen's you, the glass
+  reflection's you: `look` dictionaries as before, plus `belly`, `sleeves`,
+  `brows`, `collar`). Each body is ONE mesh (`Puppet.Shape`: a lofted torso,
+  each arm and leg one tube swept from inside the torso to a mitten hand or
+  a shoe, clothes baked in; one surface per colour); the head is one mesh on
+  its own node, eyes and mouth separate (they blink and talk). Never build a
+  person from separate boxes again. Seated ones sink by `Puppet.SIT_DROP`
+  onto `_chair()`; Dale's pose is "desk" (forearms on it). Props to reuse:
   `_chair`, `_mug`, `_tape` (a poster's four bits of tape). Check a model by
   eye with `tools/look_shot.gd` (stand anywhere, save a PNG, prints triangle
   counts); `addons/hh_minigames/_shared/tests/test_handmade.gd` keeps the
@@ -192,6 +197,12 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   https://humble-house-studios.github.io/Look-busy/ (`deploy.yml`). Screenshots: `tools/office_shot.gd`. `main.gd` must not touch
   the window when it isn't the root (`_owns_window()`).
 - Office design direction lives in docs/look-busy.md; read it before any office change.
+- **The sunset** (`scenes/office/sunset.gdshader`, `_sunset_quad()`): a painted
+  evening over the bay, alive (the sun drifts, clouds, glittering water, gulls,
+  a palm; `night` = after hours: stars, the city lit). It's the real view out
+  of Dale's window (the left wall has an opening; a big backdrop past it,
+  blinds half up) and the framed "Golden Hour" print on the front wall by
+  Pong (`SUNSET_PICTURE`). Every sunset material follows `_apply_night()`.
 - **Look Busy** (`scenes/office/look_busy.gd`, on/off as LOOK BUSY in the pause
   menu, setting `look_busy`; off = the office exactly as before): a 9-to-5
   workday (`Workday.DAY_SECONDS` real seconds) and a work week per run, one
@@ -202,8 +213,17 @@ right there, it's right on iPhone, Android and Steam. To keep that true:
   `Computer.cover`) and freezes the game under it (`_freeze()`). Talking to
   someone holds suspicion; off the floor (up the elevator) it doesn't cool,
   so missed desk checks add up. Pop-ups: `scenes/office/busy_notice.gd`. Title screen:
-  `scenes/office/busy_title.gd` (once per launch: a looping cartoon filmed live in the 3D office (stand-in you + Marge) of the
-  loop and three rules, nothing past floor 1 named). Slack meter: playing a
+  `scenes/office/busy_title.gd` (once per launch), an Xbox 360-era title: the
+  real office at sunset filmed live by a cinematic camera (opens close on the
+  Golden Hour picture, then Dale against the window, a crane, a desk dolly;
+  white-gold dips between shots; dust in the sunbeam; `title_post.gdshader`
+  bloom/grade/grain/vignette; letterbox), the gold logo
+  (`title_logo.gdshader`, Inter fonts in `scenes/office/fonts/`, OFL), PRESS
+  START, then a menu with a sliding glossy bar (CLOCK IN / HOW TO PLAY /
+  OPTIONS, `_go` / `_how` / `_options`), a records card and button prompts.
+  HOW TO PLAY = the looping cartoon filmed live (stand-in you + Marge) and the
+  three rules; nothing past floor 1 named. Shots: `tools/title_shot.gd`. Why:
+  docs/look-busy.md, "Title screen". Slack meter: playing a
   game unseen fills the day's quota (`Workday.QUOTA`, starts with a coffee
   break); alt-tab with the boss within 4 m = a close call (bonus slack);
   slack becomes research on Friday (`ShipDay.research`). **After hours:** 5 PM

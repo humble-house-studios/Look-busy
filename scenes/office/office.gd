@@ -289,6 +289,11 @@ class Computer:
 
 const Handmade := preload("res://addons/hh_minigames/_shared/handmade.gd")
 const Puppet := preload("res://scenes/office/puppet.gd")
+const SUNSET := preload("res://scenes/office/sunset.gdshader")
+## The framed sunset on the front wall: its centre and the painted canvas.
+const SUNSET_PICTURE := Vector3(-2.95, 1.66, 3.975)
+const SUNSET_CANVAS := Vector2(0.8, 0.54)
+var _sunset_mats: Array[ShaderMaterial] = []
 var _ps1 := preload("res://scenes/office/ps1.gdshader")
 ## True while walls, floors and ceilings are being built: those boxes stay
 ## exact (see _box) so rooms have no gaps.
@@ -965,6 +970,8 @@ func _apply_night() -> void:
 		m.set_shader_parameter("after_hours", e)
 	for g in _night_glow:
 		g[0].set_shader_parameter("emission", (g[1] as Color).lerp(g[2], e))
+	for m in _sunset_mats:
+		m.set_shader_parameter("night", e)
 
 
 func _build_room() -> void:
@@ -984,7 +991,12 @@ func _build_room() -> void:
 	_box(Vector3(4.55, 2.6, 0.1), Vector3(-1.425, 1.3, 4.05), wall, true)
 	_box(Vector3(0.95, 2.6, 0.1), Vector3(3.225, 1.3, 4.05), wall, true)
 	_box(Vector3(1.9, 0.1, 0.1), Vector3(1.8, 2.55, 4.05), wall, true)
-	_box(Vector3(0.1, 2.6, 7.2), Vector3(-3.55, 1.3, 0.5), wall, true)
+	# The left wall, built round the window opening (z -1.4..0.4, y 0.95..2.05)
+	# so you can see out of it.
+	_box(Vector3(0.1, 0.95, 7.2), Vector3(-3.55, 0.475, 0.5), wall, true)
+	_box(Vector3(0.1, 0.55, 7.2), Vector3(-3.55, 2.325, 0.5), wall, true)
+	_box(Vector3(0.1, 1.1, 1.7), Vector3(-3.55, 1.5, -2.25), wall, true)
+	_box(Vector3(0.1, 1.1, 3.7), Vector3(-3.55, 1.5, 2.25), wall, true)
 	_box(Vector3(0.1, 2.6, 7.2), Vector3(3.55, 1.3, 0.5), wall, true)
 	for b in [[Vector3(7.0, 0.1, 0.02), Vector3(0, 0.05, -2.99)], [Vector3(4.35, 0.1, 0.02), Vector3(-1.325, 0.05, 3.99)],
 			[Vector3(0.75, 0.1, 0.02), Vector3(3.125, 0.05, 3.99)],
@@ -997,14 +1009,25 @@ func _build_room() -> void:
 	_box(Vector3(0.6, 0.03, 1.2), Vector3(0, 2.59, -1.6), panel)
 	_box(Vector3(0.6, 0.03, 1.2), Vector3(0, 2.59, 2.2), panel)
 
-	# Window on the left wall: an orange evening sky through half-open blinds,
-	# and the long low sunbeam it throws across the carpet.
-	var sky := _mat(Color(0.5, 0.48, 0.42), 4, Color(0.1, 0.1, 0.1), 24.0, Color(1.0, 0.68, 0.36))
-	_night_glow.append([sky, Color(1.0, 0.68, 0.36), Color(0.14, 0.2, 0.42)])
-	_box(Vector3(0.04, 1.1, 1.8), Vector3(-3.49, 1.5, -0.5), sky)
+	# Window on the left wall: the real sunset over the bay outside
+	# (sunset.gdshader, a big painted backdrop out past the wall), the blinds
+	# pulled half way up, and the long low sunbeam across the carpet.
+	_sunset_quad(Vector2(10.0, 5.5), Vector3(-6.5, 1.3, -0.5), Vector3(0, PI / 2, 0),
+		{"grid": 420.0, "horizon": 0.5, "sun_x": 0.53, "window_view": 1.0})
 	_box(Vector3(0.08, 1.2, 0.06), Vector3(-3.47, 1.5, 0.43), trim)
 	_box(Vector3(0.08, 1.2, 0.06), Vector3(-3.47, 1.5, -1.43), trim)
 	_box(Vector3(0.12, 0.05, 1.9), Vector3(-3.45, 0.93, -0.5), trim)
+	_box(Vector3(0.1, 0.06, 1.9), Vector3(-3.46, 2.07, -0.5), trim)
+	_box(Vector3(0.04, 0.04, 1.8), Vector3(-3.56, 1.5, -0.5), trim)
+	var slat := _mat(Color(0.78, 0.66, 0.5), 0, Color.BLACK, 24.0, Color(0.1, 0.05, 0.01))
+	_night_glow.append([slat, Color(0.1, 0.05, 0.01), Color(0.0, 0.0, 0.0)])
+	var y := 2.0
+	while y > 1.42:
+		_box(Vector3(0.05, 0.012, 1.78), Vector3(-3.46, y, -0.5), slat, false, Vector3(0, 0, -0.55))
+		y -= 0.05
+	_box(Vector3(0.06, 0.025, 1.8), Vector3(-3.46, 1.4, -0.5), slat)
+	_cyl(0.004, 0.5, Vector3(-3.43, 1.58, 0.3), _mat(Color(0.92, 0.88, 0.8)), Vector3.ZERO, 4)
+	_lump(Vector3(0.02, 0.035, 0.02), Vector3(-3.43, 1.32, 0.3), _mat(Color(0.92, 0.88, 0.8)), null)
 	var beam := _mat(Color(0.58, 0.66, 0.56), 1, Color(0.5, 0.58, 0.5), 28.0, Color(0.42, 0.2, 0.04))
 	_night_glow.append([beam, Color(0.42, 0.2, 0.04), Color(0.02, 0.04, 0.1)])
 	_box(Vector3(4.2, 0.004, 1.3), Vector3(-1.3, 0.003, -0.35), beam, false, Vector3(0, 0.18, 0))
@@ -1015,6 +1038,7 @@ func _build_room() -> void:
 	_build_loot_cabinet()
 	_build_cube_desk()
 	_build_props()
+	_build_sunset_picture()
 	_build_vent()
 	_build_dale()
 	_ladder.build()
@@ -1384,6 +1408,45 @@ func _play_step(db: float) -> void:
 	feet.pitch_scale = randf_range(0.9, 1.1)
 	feet.play()
 	_step_i += 1
+
+
+## The sunset (sunset.gdshader) on a quad facing +z of `rot`, `size` across.
+## Every one follows the after-hours fade (_apply_night).
+func _sunset_quad(size: Vector2, pos: Vector3, rot: Vector3, params: Dictionary, parent: Node = null) -> MeshInstance3D:
+	var m := ShaderMaterial.new()
+	m.shader = SUNSET
+	m.set_shader_parameter("aspect", size.x / size.y)
+	for k in params:
+		m.set_shader_parameter(k, params[k])
+	m.set_shader_parameter("night", _night * _night * (3.0 - 2.0 * _night))
+	_sunset_mats.append(m)
+	var q := QuadMesh.new()
+	q.size = size
+	var mi := MeshInstance3D.new()
+	mi.mesh = q
+	mi.material_override = m
+	mi.layers = LAYER_WORLD
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = pos
+	mi.rotation = rot
+	(parent if parent else _world_vp).add_child(mi)
+	return mi
+
+
+## "Golden Hour": the sunset, framed on the front wall by Pong's corner. The
+## title screen opens on it (busy_title.gd).
+func _build_sunset_picture() -> void:
+	var at := SUNSET_PICTURE
+	var wood := _mat(Color(0.36, 0.22, 0.13), 3, Color(0.3, 0.18, 0.1), 60.0)
+	var matte := _mat(Color(0.93, 0.9, 0.82))
+	var face := Vector3(0, PI, 0)
+	_box(Vector3(0.94, 0.68, 0.012), at + Vector3(0, 0, 0.012), matte, false, face)
+	_sunset_quad(SUNSET_CANVAS, at + Vector3(0, 0, -0.002), face, {"grid": 240.0, "level": 0.92, "horizon": 0.34, "sun_x": 0.42})
+	for bar in [[Vector3(1.04, 0.06, 0.05), Vector3(0, 0.37, 0)], [Vector3(1.04, 0.06, 0.05), Vector3(0, -0.37, 0)],
+			[Vector3(0.06, 0.8, 0.05), Vector3(0.49, 0, 0)], [Vector3(0.06, 0.8, 0.05), Vector3(-0.49, 0, 0)]]:
+		_box(bar[0], at + bar[1], wood, false, face)
+	_box(Vector3(0.22, 0.05, 0.012), at + Vector3(0, -0.44, 0.005), _mat(Color(0.78, 0.64, 0.3)), false, face)
+	_label("GOLDEN HOUR", at + Vector3(0, -0.44, -0.004), 6, Color(0.22, 0.14, 0.06), face)
 
 
 func _build_props() -> void:

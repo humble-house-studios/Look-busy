@@ -3,7 +3,7 @@ extends SceneTree
 ## to $OUT (needs a display):
 ##   OUT=/some/dir LAYOUT=portrait xvfb-run -a -s "-screen 0 720x1280x24" \
 ##     godot --rendering-driver opengl3 --resolution 720x1280 -s res://tools/busy_shot.gd
-## Shots: title / title_alt_tab / title_caught = the title screen and its
+## Shots: title / title_menu / title_alt_tab / title_caught = the title screen (attract, menu), its
 ## cartoon, clock_in = the first seconds after CLOCK IN, morning = the morning card, boss = the boss walking the floor with
 ## the clock HUD, seated = sitting at your desk with the boss behind you (the
 ## reflection), sheet = alt-tabbed to the spreadsheet, caught = the warning,
@@ -26,13 +26,21 @@ func _init() -> void:
 	office._touch = true
 	await _frames(30)
 	var title = busy.title_screen
+	await _frames(60)
 	_shot("title")
+	title._to_menu()
+	await _frames(60)
+	_shot("title_menu")
+	title._open_how()
+	await _frames(20)
 	title._demo.t = 6.8
 	await _frames(2)
 	_shot("title_alt_tab")
 	title._demo.t = 13.0 + 7.6
 	await _frames(2)
 	_shot("title_caught")
+	title._close_how()
+	await _frames(2)
 	title._go.pressed.emit()
 	await _frames(20)
 	_shot("clock_in")

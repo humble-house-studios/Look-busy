@@ -296,10 +296,25 @@ were boxes with boxes for faces.
 |---|---|
 | **Every shape is hand-made** (`handmade.gd`): bevelled edges, corners that are never quite square, tubes that are never quite round, lumps of clay for anything soft. Each piece gets its own paint mix. | A perfect box reads as a placeholder. Something slightly off-square with a worn edge reads as a thing somebody built, which is the whole PS1-diorama charm. |
 | **Painted, not noisy.** The per-texel static is now a blotchy coat with long brush strokes; bevels are dry-brushed lighter on top and darker underneath; everything darkens toward the floor and solid furniture sits on a soft painted shadow. | The static made every wall look like the same material. Paint, worn edges and grounding shadows are what model-makers do to make a miniature look real. |
-| **People are puppets** (`puppet.gd`): a soft block of a head with ears, a nose, blushed cheeks, brows, and eyes with whites; shoulders, hands with thumbs, collars, shoes; hair built up in pieces. Dale gets a short-sleeved pale blue shirt. | You spend the game talking to these people, close up. Boxes with dots can't look bored, smug or stern. Dale's cream shirt was the same colour as his skin in the window light, so he read as one lump. |
+| **People are puppets** (`puppet.gd`): a soft block of a head with ears, a nose, blushed cheeks, brows, and eyes with whites; shoulders, hands with thumbs, collars, shoes; hair built up in pieces. Dale gets a short-sleeved pale blue shirt. (Since 2026-11-10 evening: each body is one continuous mesh, see "Title screen".) | You spend the game talking to these people, close up. Boxes with dots can't look bored, smug or stern. Dale's cream shirt was the same colour as his skin in the window light, so he read as one lump. |
 | **The sun doesn't burn out.** A soft shoulder on the brightest light (glows keep their punch). | Dale sits in the window: his face was flat yellow. Golden hour should be warm, not blown. |
 | **Props made properly**: swivel chairs with cushions and casters, mugs with handles, a jug on the water cooler, a leaning plant, taped-up posters, a clock with hour marks, Dale's desk lamp, a coat rack, unpacked moving boxes, traders' chairs and CRTs, the founder's leather chair. | Lived-in clutter is what sells "office", and each one is a chance for a silhouette that isn't a box. |
 | **Kept exact on purpose:** walls, floors, ceilings, elevators, glass, screens. | Crooked walls leave gaps you can see the void through, and a game's screen has to stay a clean rectangle. |
 
 Cost: about a third more triangles and draw calls in the busiest views
 (arcade ~59k triangles), build time +0.3 s on a desktop.
+
+## Title screen, one-piece people, the sunset (2026-11-10)
+
+Samuel: Dale's arms looked weird; make every body one continuous mesh; and
+the title screen should be an animated Xbox 360-era title, a sunset scene
+from the office, maybe a picture from the wall, something higher quality.
+
+| Change | Why |
+|---|---|
+| **One mesh per body** (`Puppet.Shape`): the torso is lofted from rings (hips, waist, belly, chest, shoulders, neck); each arm and leg is one tube swept along a smooth curve from inside the torso through the elbow or knee to a mitten hand or a shoe. Ties, straps and lanyards are strips swept down the chest. One draw per colour instead of ~40 pieces a person. | Separate boxes and sticks met at the joints with gaps and kinks (Dale's elbows floated off his forearms). A swept tube can't break at the elbow, so arms read as arms from any angle. |
+| **A real view out of the window**: the wall has an opening, the blinds are half up, and outside is the sunset over the bay (`sunset.gdshader`, alive: the sun drifts, clouds move, the water glitters, gulls cross; at night stars and the city's lights). | The window was a glowing striped panel. Golden hour is the office's whole mood; now you can see the sun it comes from, and Dale talks to you against it. |
+| **"Golden Hour"**, the same painting framed on the front wall. | A picture from the wall for the title to open on, and a quiet thing to notice later. |
+| **The title is a 360-era attract loop**: the real office filmed live (close on the painting, pulling back; Dale against the window; a crane over the room; a dolly past the main desk), white-gold dips between shots, dust in the sunbeam, bloom, warm grade, light leak, grain, vignette, letterbox. A polished gold logo with a glint, PRESS START, then a menu with a glossy slanted highlight that glides between items, a line saying what each does, a records card, button prompts. HOW TO PLAY keeps the cartoon and the three rules on a glass panel. | A flat panel of rules looked like a settings page. Showing the office itself, at its most beautiful, sells the place before you clock in, and that era's titles are exactly this: a slow cinematic loop, a shiny logo, a menu that feels physical. The rules moved one tap away, so returning players aren't reading them every launch. |
+| **Inter** for the title (trimmed to Latin, ~40 KB a weight, OFL). | 360 menus used clean bold sans fonts; the pixel font stays everywhere in the game itself. |
+
